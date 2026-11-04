@@ -36,3 +36,18 @@ android/              .NET for Android host project
 patches/              patches applied on top of OpenRA
 .github/workflows/    APK build
 ```
+
+## Building
+
+Push to `main` or run **Build APK** from the repository's Actions tab. The workflow:
+builds SDL2/OpenAL/FreeType/Lua for arm64 with the NDK, compiles SDL's Java glue, fetches
+and patches OpenRA at `OPENRA_REF`, packs the engine payload and publishes a signed APK.
+
+Artifacts: `OpenRA-Android-apk` (the APK) and `build-logs` (one log per stage).
+The signing key is cached between runs so new builds install over old ones; if the cache is
+evicted, uninstall the old APK first.
+
+## Debugging on device
+
+`adb logcat -s OpenRA mono-stdout` shows the host and engine output. A managed crash is also
+written to `files/support/host-crash.txt` and OpenRA's own logs go to `files/support/Logs/`.

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto">
+	<uses-feature android:glEsVersion="0x00030000" android:required="true" />
+	<uses-feature android:name="android.hardware.touchscreen" android:required="true" />
+	<application android:label="OpenRA" android:extractNativeLibs="true" android:largeHeap="true">
+		<activity
+			android:name="org.openra.android.OpenRAActivity"
+			android:exported="false"
+			android:label="OpenRA"
+			android:launchMode="singleTask"
+			android:screenOrientation="sensorLandscape"
+			android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+			android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|navigation|density" />
+	</application>
+</manifest>

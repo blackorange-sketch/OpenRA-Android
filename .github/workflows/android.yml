@@ -1,0 +1,83 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      KEYSTORE: ${{ github.workspace }}/openra-dev.keystore
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}" >> "$GITHUB_ENV"
+          dotnet --info | head -n 12
+          cmake --version | head -n 1
+
+      - name: Build native libraries (SDL2, OpenAL, FreeType, Lua)
+        run: bash scripts/build-native.sh 2>&1 | tee native-build.log
+
+      - name: Build Java glue (SDLActivity)
+        run: bash scripts/build-java.sh 2>&1 | tee java-build.log
+
+      - name: Fetch, patch and package OpenRA
+        run: bash scripts/prepare-openra.sh 2>&1 | tee openra-build.log
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Signing key (cached so updates install over each other)
+        uses: actions/cache@v4
+        with:
+          path: openra-dev.keystore
+          key: openra-dev-keystore-v1
+
+      - name: Create signing key if missing
+        run: |
+          if [ ! -f "$KEYSTORE" ]; then
+            keytool -genkeypair -keystore "$KEYSTORE" -alias openra -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass openra-dev -keypass openra-dev -dname "CN=OpenRA Android Dev"
+          fi
+
+      - name: Build APK
+        run: |
+          dotnet publish android/OpenRA.Android/OpenRA.Android.csproj -c Release \
+            -p:InstallAndroidDependencies=true -p:AcceptAndroidSDKLicenses=True \
+            -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$KEYSTORE" \
+            -p:AndroidSigningStorePass=openra-dev -p:AndroidSigningKeyAlias=openra -p:AndroidSigningKeyPass=openra-dev \
+            2>&1 | tee apk-build.log
+          APK="$(find android/OpenRA.Android/bin -name '*-Signed.apk' | head -n 1)"
+          echo "APK=$APK"
+          [ -n "$APK" ] || { echo "No signed APK produced" >&2; exit 1; }
+          mkdir -p dist && cp "$APK" dist/OpenRA-Android.apk
+          unzip -l dist/OpenRA-Android.apk | grep -E 'lib/|assets/|classes' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenRA-Android-apk
+          path: dist/OpenRA-Android.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs
+          path: "*.log"

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0-android</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<AssemblyName>OpenRA.AndroidHost</AssemblyName>
+		<RootNamespace>OpenRAHost</RootNamespace>
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<LangVersion>13</LangVersion>
+
+		<ApplicationId>org.openra.android</ApplicationId>
+		<ApplicationTitle>OpenRA</ApplicationTitle>
+		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+		<SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+
+		<RuntimeIdentifier>android-arm64</RuntimeIdentifier>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+
+		<!-- OpenRA loads mod assemblies and types by reflection: no trimming, no AOT. -->
+		<PublishTrimmed>false</PublishTrimmed>
+		<AndroidLinkMode>None</AndroidLinkMode>
+		<RunAOTCompilation>false</RunAOTCompilation>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\openra\OpenRA.Game\OpenRA.Game.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Built by scripts/build-native.sh -->
+		<AndroidNativeLibrary Include="lib\arm64-v8a\*.so">
+			<Abi>arm64-v8a</Abi>
+		</AndroidNativeLibrary>
+		<!-- Built by scripts/build-java.sh: SDLActivity + OpenRAActivity, dexed without bindings -->
+		<AndroidJavaLibrary Include="libs\openra-java.jar" />
+	</ItemGroup>
+</Project>
