@@ -47,6 +47,9 @@ echo "==> payload/bin:"; ls -1 "$STAGE/bin" | sed 's/^/    /'
 echo "==> Assemblies requested by the d2k mod manifest:"
 grep -A8 '^Assemblies:' "$OPENRA/mods/d2k/mod.yaml" || true
 
+echo "==> Building Russian/English text sets"
+python3 "$ROOT/scripts/merge-ftl.py" "$OPENRA" "$ROOT/translations/ru" "$STAGE/translations"
+
 mkdir -p "$ASSETS"
 python3 "$ROOT/scripts/gen-manifest.py" "$ASSETS/content-manifest.txt" \
 	"$OPENRA/mods/d2k-content/installer/d2k.yaml" "$OPENRA/mods/d2k-content/installer/gruntmods.yaml"

@@ -52,6 +52,38 @@ namespace OpenRAHost
 			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutInt("touch_dy", Math.Clamp(value, -60, 150)).Apply();
 		}
 
+		// "ru" or "en": which text set is copied over the mod files before the game starts.
+		string TextLanguage
+		{
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetString("lang", "ru");
+			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutString("lang", value).Apply();
+		}
+
+		static void CopyTree(string from, string to)
+		{
+			if (!System.IO.Directory.Exists(from))
+				return;
+
+			foreach (var file in System.IO.Directory.GetFiles(from, "*", System.IO.SearchOption.AllDirectories))
+			{
+				var dest = System.IO.Path.Combine(to, System.IO.Path.GetRelativePath(from, file));
+				System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest));
+				System.IO.File.Copy(file, dest, true);
+			}
+		}
+
+		void ApplyTextLanguage()
+		{
+			try
+			{
+				CopyTree(System.IO.Path.Combine(engineRoot, "translations", TextLanguage), engineRoot);
+			}
+			catch (Exception e)
+			{
+				Android.Util.Log.Warn("OpenRA", "Could not apply text language: " + e.Message);
+			}
+		}
+
 		// 0 = no cap (follows the display refresh rate).
 		int FpsCap
 		{
@@ -205,6 +237,12 @@ namespace OpenRAHost
 					false, true, () => { VoiceFolder = russian ? "GAMESFX" : "GAMESFXRus"; BuildMain(); }),
 					ButtonParams(Dp(10)));
 				card.AddView(MakeText("Озвучка застосовується при наступному імпорті файлів.", 12, Dim));
+
+				var lang = TextLanguage;
+				card.AddView(MakeButton("Мова тексту: " + (lang == "ru" ? "російська" : "English") + "  — змінити",
+					false, true, () => { TextLanguage = lang == "ru" ? "en" : "ru"; BuildMain(); }),
+					ButtonParams(Dp(10)));
+				card.AddView(MakeText("Переклад: місії, меню, назви юнітів. Решта лишається англійською.", 12, Dim));
 
 				var cap = FpsCap;
 				card.AddView(MakeButton("Ліміт кадрів: " + (cap == 0 ? "без ліміту" : cap + " FPS") + "  — змінити",
@@ -360,6 +398,7 @@ namespace OpenRAHost
 
 			// A crash file from an earlier run must not be reported as the result of this one.
 			DiagnosticsReport.Clear(FilesRoot);
+			ApplyTextLanguage();
 			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy, FpsCap, ShowFps);
 
 			var intent = new Intent();
