@@ -40,6 +40,12 @@ namespace OpenRAHost
 		string busyText = "";
 		string lastImportNote;
 
+		int TouchDy
+		{
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetInt("touch_dy", 30);
+			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutInt("touch_dy", Math.Clamp(value, -60, 150)).Apply();
+		}
+
 		string FilesRoot => FilesDir.AbsolutePath;
 
 		protected override void OnCreate(Bundle savedInstanceState)
@@ -164,6 +170,16 @@ namespace OpenRAHost
 				var import = MakeButton(contentOk ? "Імпортувати знову" : "Імпортувати файли гри", !contentOk,
 					true, StartPicker);
 				card.AddView(import, ButtonParams(Dp(10)));
+
+				var calib = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+				calib.SetGravity(GravityFlags.CenterVertical);
+				var calibText = MakeText("Тап вище на " + TouchDy + " px", 14, Text);
+				calib.AddView(calibText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+				calib.AddView(MakeButton("−", false, true, () => { TouchDy -= 10; BuildMain(); }),
+					new LinearLayout.LayoutParams(Dp(64), ViewGroup.LayoutParams.WrapContent));
+				calib.AddView(MakeButton("+", false, true, () => { TouchDy += 10; BuildMain(); }),
+					new LinearLayout.LayoutParams(Dp(64), ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(8) });
+				card.AddView(calib, ButtonParams(Dp(10)));
 
 				var diag = MakeButton("Діагностика", false, true,
 					() => ShowReport(engineError ?? DiagnosticsReport.BuildAlways(FilesRoot), false));
@@ -305,7 +321,7 @@ namespace OpenRAHost
 
 			// A crash file from an earlier run must not be reported as the result of this one.
 			DiagnosticsReport.Clear(FilesRoot);
-			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale());
+			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(), TouchDy);
 
 			var intent = new Intent();
 			intent.SetClassName(this, "org.openra.android.OpenRAActivity");

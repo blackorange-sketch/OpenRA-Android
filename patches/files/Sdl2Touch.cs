@@ -24,6 +24,9 @@ namespace OpenRA.Platforms.Default
 
 		enum Mode { Idle, Pending, Drag, LongPress, Multi, Ignore }
 
+		// Vertical calibration in physical pixels (set in the launcher): positive moves the touch point up.
+		static readonly int TouchDy = int.TryParse(Environment.GetEnvironmentVariable("OPENRA_TOUCH_DY"), out var dy) ? dy : 0;
+
 		const uint LongPressMs = 400;
 		const uint SecondTapMs = 300;
 
@@ -152,7 +155,7 @@ namespace OpenRA.Platforms.Default
 			var slop = height * 0.02f;
 			var f = e.tfinger;
 			var x = f.x * w;
-			var y = f.y * height;
+			var y = Math.Max(0, f.y * height - TouchDy);
 			int2 P(float px, float py) => toPos((int)px, (int)py);
 
 			switch (e.type)
