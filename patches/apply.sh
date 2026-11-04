@@ -190,6 +190,38 @@ patch(
     "\t\t\t\t\t\t\tcase SDL.SDL_WindowEventID.SDL_WINDOWEVENT_FOCUS_LOST:\n\t\t\t\t\t\t\t\tdevice.HasInputFocus = false;\n"
     "\t\t\t\t\t\t\t\tGame.PauseForBackground();\n",
 )
+# 9c. Content installer: folders the launcher imported into SupportDir/Import count as a content source
+#     (Android has no discs, registry or Steam to look at).
+patch(
+    "OpenRA.Mods.Common/Installer/InstallerUtils.cs",
+    "\t\tpublic static void CopyStream(",
+    "\t\t/// <summary>Android host: game folders imported into SupportDir/Import act as an extra content source.</summary>\n"
+    "\t\tpublic static string FindImportedSource(ModContent.ModSource source)\n"
+    "\t\t{\n"
+    "\t\t\ttry\n"
+    "\t\t\t{\n"
+    "\t\t\t\tvar root = Path.Combine(Platform.SupportDir, \"Import\");\n"
+    "\t\t\t\tif (!Directory.Exists(root))\n"
+    "\t\t\t\t\treturn null;\n\n"
+    "\t\t\t\tif (IsValidSourcePath(root, source))\n"
+    "\t\t\t\t\treturn root;\n\n"
+    "\t\t\t\tforeach (var dir in Directory.EnumerateDirectories(root, \"*\", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 6 }))\n"
+    "\t\t\t\t\tif (IsValidSourcePath(dir, source))\n"
+    "\t\t\t\t\t\treturn dir;\n"
+    "\t\t\t}\n"
+    "\t\t\tcatch (Exception)\n"
+    "\t\t\t{\n"
+    "\t\t\t}\n\n"
+    "\t\t\treturn null;\n"
+    "\t\t}\n\n"
+    "\t\tpublic static void CopyStream(",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Installation/InstallFromSourceLogic.cs",
+    "\t\t\t\t\tvar path = sourceResolver.FindSourcePath(kv.Value);\n",
+    "\t\t\t\t\tvar path = sourceResolver.FindSourcePath(kv.Value) ?? InstallerUtils.FindImportedSource(kv.Value);\n",
+)
+
 # 10. Mission browser: one tab per house (the stock screen is a single long list of all campaigns).
 CB = "OpenRA.Mods.Common/Widgets/Logic/MissionBrowserLogic.cs"
 patch(

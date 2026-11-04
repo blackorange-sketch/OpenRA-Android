@@ -53,6 +53,8 @@ python3 "$ROOT/scripts/merge-ftl.py" "$OPENRA" "$ROOT/translations/ru" "$STAGE/t
 mkdir -p "$ASSETS"
 python3 "$ROOT/scripts/gen-manifest.py" "$ASSETS/content-manifest.txt" \
 	"$OPENRA/mods/d2k-content/installer/d2k.yaml" "$OPENRA/mods/d2k-content/installer/gruntmods.yaml"
+python3 "$ROOT/scripts/gen-source-names.py" "$ASSETS/source-names.txt" \
+	"$OPENRA"/mods/ra-content/installer/*.yaml "$OPENRA"/mods/cnc-content/installer/*.yaml "$OPENRA"/mods/ts-content/installer/*.yaml
 python3 - "$STAGE" "$ASSETS" <<'PY'
 import hashlib, os, sys, zipfile
 

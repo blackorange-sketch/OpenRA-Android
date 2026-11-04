@@ -246,7 +246,7 @@ namespace OpenRAHost
 			}
 			else
 			{
-				var play = MakeButton("▶  Грати", true, (contentOk || !isDune) && engineReady, Launch);
+				var play = MakeButton("▶  Грати", true, (contentOk || !isDune) && engineReady, () => Launch(null));
 				card.AddView(play, ButtonParams(0));
 
 				if (isDune)
@@ -254,6 +254,23 @@ namespace OpenRAHost
 					var import = MakeButton(contentOk ? "Імпортувати знову" : "Імпортувати файли гри", !contentOk,
 						true, StartPicker);
 					card.AddView(import, ButtonParams(Dp(10)));
+				}
+				else
+				{
+					card.AddView(MakeButton("Встановити / докачати вміст", false, engineReady, () => Launch(game.Id + "-content")),
+						ButtonParams(Dp(10)));
+					card.AddView(MakeButton("Імпортувати файли гри (відео, музика)", false, true, StartPicker),
+						ButtonParams(Dp(10)));
+					card.AddView(MakeText(
+						"Вибрати папку зі Steam/Origin-версією або дисками. Потім натисніть «Встановити / докачати вміст»: гра сама розпакує відео й музику.",
+						12, Dim));
+					if (SourceImporter.HasImport(FilesRoot))
+						card.AddView(MakeButton("Видалити скопійовані файли імпорту (звільнити місце)", false, true, () =>
+						{
+							SourceImporter.Clear(FilesRoot);
+							lastImportNote = "Файли імпорту видалено.";
+							BuildMain();
+						}), ButtonParams(Dp(10)));
 				}
 
 				var calib = new LinearLayout(this) { Orientation = Orientation.Horizontal };
@@ -389,6 +406,24 @@ namespace OpenRAHost
 
 			Task.Run(() =>
 			{
+				if (SelectedGame != "d2k")
+				{
+					var (files, bytes, error) = SourceImporter.Import(this, tree, FilesRoot, SelectedGame, msg =>
+					{
+						busyText = msg;
+						RunOnUiThread(() => BuildMain());
+					});
+
+					lastImportNote = error != null
+						? "Помилка імпорту: " + error
+						: files == 0
+							? "У вибраній папці не знайдено потрібних файлів. Виберіть папку встановленої гри або диска."
+							: $"Скопійовано файлів: {files} ({bytes / 1048576} МБ). Тепер натисніть «Встановити / докачати вміст».";
+					busy = false;
+					RunOnUiThread(BuildMain);
+					return;
+				}
+
 				var result = ContentImporter.Import(this, tree, FilesRoot, VoiceFolder, msg =>
 				{
 					busyText = msg;
@@ -428,7 +463,9 @@ namespace OpenRAHost
 			return scale.ToString("0.##", CultureInfo.InvariantCulture);
 		}
 
-		void Launch()
+		void Launch() => Launch(null);
+
+		void Launch(string modOverride)
 		{
 			if (!engineReady)
 				return;
@@ -436,7 +473,7 @@ namespace OpenRAHost
 			// A crash file from an earlier run must not be reported as the result of this one.
 			DiagnosticsReport.Clear(FilesRoot);
 			ApplyTextLanguage();
-			OpenRAEntry.Configure(SelectedGame, engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy, FpsCap, ShowFps);
+			OpenRAEntry.Configure(modOverride ?? SelectedGame, engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy, FpsCap, ShowFps);
 
 			var intent = new Intent();
 			intent.SetClassName(this, "org.openra.android.OpenRAActivity");
