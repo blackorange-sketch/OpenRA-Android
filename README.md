@@ -1,0 +1,38 @@
+# OpenRA-Android
+
+Native Android port of [OpenRA](https://github.com/OpenRA/OpenRA), focused on the **Dune 2000** mod (`d2k`).
+The APK ships no game data: on first launch the user picks the folder with their own Dune 2000 files.
+
+Pinned engine: `OpenRA/OpenRA` commit `9636b63eaee62fcb60ef2e896e7985bdf2f1ee68` (see `OPENRA_REF`).
+
+## Findings from the engine source (recon)
+
+- Engine targets `net10.0`; window, input and audio go through SDL2 + OpenAL, fonts through FreeType, scripting through Lua 5.1 (`OpenRA-Eluant`).
+- The renderer already has a GLES 3.0 path (`GLProfile.Embedded` / `ANGLE` in `OpenRA.Platforms.Default/Sdl2PlatformWindow.cs`), so no renderer rewrite is expected. Shaders in `glsl/` still need a check against real GLES drivers.
+- Native libs come only as desktop NuGet packages (`OpenRA-SDL2-CS`, `OpenRA-OpenAL-CS`, `OpenRA-Freetype6`, `OpenRA-Eluant`). Android arm64 builds of SDL2, openal-soft, FreeType and Lua 5.1 must be built from source.
+- `Sdl2Input.cs` handles only mouse events. Touch must be mapped to mouse/keyboard actions.
+- User data paths come from `Platform.cs` (`SupportDir`); on Android they must point into app-private storage.
+- Mod assemblies are loaded by `OpenRA.Game/Support/AssemblyLoader.cs` (AssemblyLoadContext). Trimming/AOT must not remove them.
+
+## Milestones
+
+1. **M1 - window.** CI builds the native libs for arm64-v8a and an APK that creates an SDL window with a GLES 3.0 context and runs the OpenRA main loop to the mod chooser.
+2. **M2 - content.** Folder picker (SAF) for the original Dune 2000 files, copy into app storage, hook into the D2k content installer.
+3. **M3 - touch.** Tap = left click, long press = right click, drag = selection box, two-finger drag = camera, on-screen buttons for hotkeys.
+4. **M4 - polish.** Performance on Snapdragon 8 Gen 2, audio latency, back button/pause handling, settings.
+
+## Open risks
+
+- Hosting the SDL main loop from managed code under .NET for Android (activity lifecycle, GL context loss on pause).
+- Whether the user's repack data (Russian localisation) is compatible with the OpenRA D2k importer. Untested.
+- Runtime speed of the .NET runtime on device. Untested.
+
+## Layout (planned)
+
+```
+OPENRA_REF            pinned OpenRA commit
+scripts/              native library build scripts (NDK)
+android/              .NET for Android host project
+patches/              patches applied on top of OpenRA
+.github/workflows/    APK build
+```
