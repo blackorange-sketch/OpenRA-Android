@@ -7,11 +7,15 @@
 //   building placement     first tap / drag only moves the ghost; a second tap near it confirms
 //   second finger tap      right click at the second finger
 //   two finger drag        pan the battlefield, pinch zooms
+//   minimap                tap / drag moves the camera; long press and release gives an order there
+//   top button row         control groups 1-5 (tap select, double tap select + centre, hold to assign),
+//                          select all, to base, to last event, pause, and a "+" toggle (next selection is added)
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using System.Reflection;
+using OpenRA.Graphics;
 using OpenRA.Primitives;
 using OpenRA.Widgets;
 using SDL2;
@@ -26,7 +30,7 @@ namespace OpenRA.Platforms.Default
 			public uint StartTick;
 		}
 
-		enum Mode { Idle, Pending, Drag, PlaceDrag, PanDrag, ScrollDrag, LongPress, Multi, Ignore }
+		enum Mode { Idle, Pending, Drag, PlaceDrag, PanDrag, ScrollDrag, LongPress, Multi, Ignore, Hud }
 
 		// Vertical calibration in physical pixels (set in the launcher): positive moves the touch point up.
 		static readonly int TouchDy = int.TryParse(Environment.GetEnvironmentVariable("OPENRA_TOUCH_DY"), out var dy) ? dy : 0;
@@ -103,6 +107,208 @@ namespace OpenRA.Platforms.Default
 
 		Func<int, int, int2> lastToPos;
 
+		// "+" toggle: the next selection (tap or box) on the battlefield is added to the current one (Shift).
+		internal static bool AddMode;
+
+		MouseButton panBtn = MouseButton.Middle;
+
+		// ---- On-screen buttons: drawn by DrawOverlay, hit-tested here before anything reaches the widget tree ----
+		enum HudKind { Group, SelectAll, Base, Event, Pause, Add }
+
+		struct HudButton
+		{
+			public HudKind Kind;
+			public int Index;
+			public int X, Y, W, H;
+		}
+
+		const int GroupButtons = 5;
+		readonly List<HudButton> hud = new();
+		Size hudRes;
+		int hudIndex = -1;
+		bool hudFired;
+		int lastGroup = -1;
+		uint lastGroupTick;
+
+		void LayoutHud()
+		{
+			var res = Game.Renderer.Resolution;
+			if (res == hudRes && hud.Count > 0)
+				return;
+
+			hudRes = res;
+			hud.Clear();
+
+			const float GapF = 0.12f;
+			const float SplitF = 0.7f;
+			const int Actions = 5;
+			var total = GroupButtons + Actions;
+			var avail = res.Width * 0.74f; // stay clear of the sidebar on the right
+			var size = Math.Min(res.Height * 0.115f, avail / (total + (total - 2) * GapF + SplitF));
+			var gap = size * GapF;
+			var width = total * size + (total - 2) * gap + SplitF * size;
+			var x = Math.Max(res.Height * 0.16f, (avail - width) / 2);
+			var y = res.Height * 0.012f;
+
+			var kinds = new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add };
+			for (var i = 0; i < total; i++)
+			{
+				if (i == GroupButtons)
+					x += SplitF * size - gap;
+
+				hud.Add(new HudButton
+				{
+					Kind = i < GroupButtons ? HudKind.Group : kinds[i - GroupButtons],
+					Index = i < GroupButtons ? i : 0,
+					X = (int)x,
+					Y = (int)y,
+					W = (int)size,
+					H = (int)size
+				});
+				x += size + gap;
+			}
+		}
+
+		int HudHit(int2 pos)
+		{
+			if (!Game.TouchHudActive)
+				return -1;
+
+			LayoutHud();
+			const int Pad = 4;
+			for (var i = 0; i < hud.Count; i++)
+			{
+				var b = hud[i];
+				if (pos.X >= b.X - Pad && pos.X < b.X + b.W + Pad && pos.Y >= b.Y - Pad && pos.Y < b.Y + b.H + Pad)
+					return i;
+			}
+
+			return -1;
+		}
+
+		static void Key(IInputHandler h, Keycode key, Modifiers mods, int taps = 1)
+		{
+			try
+			{
+				h.OnKeyInput(new KeyInput { Event = KeyInputEvent.Down, Key = key, Modifiers = mods, UnicodeChar = '?', MultiTapCount = taps });
+				h.OnKeyInput(new KeyInput { Event = KeyInputEvent.Up, Key = key, Modifiers = mods, UnicodeChar = '?', MultiTapCount = taps });
+			}
+			catch (InvalidOperationException e)
+			{
+				Log("key ignored: " + e.Message);
+			}
+		}
+
+		static Keycode GroupKey(int i) => (Keycode)('1' + i);
+
+		void HudTap(IInputHandler h, HudButton b)
+		{
+			Game.TouchHaptic?.Invoke(12);
+			Log($"hud tap {b.Kind} {b.Index}");
+			switch (b.Kind)
+			{
+				case HudKind.Group:
+				{
+					var now = SDL.SDL_GetTicks();
+					var taps = lastGroup == b.Index && now - lastGroupTick < 350 ? 2 : 1;
+					lastGroup = b.Index;
+					lastGroupTick = now;
+
+					// With "+" on, the group is combined with the current selection instead of replacing it.
+					Key(h, GroupKey(b.Index), AddMode ? Modifiers.Shift : Modifiers.None, taps);
+					AddMode = false;
+					break;
+				}
+
+				case HudKind.SelectAll: Key(h, Keycode.Q, Modifiers.None); break;
+				case HudKind.Base: Key(h, Keycode.H, Modifiers.None); break;
+				case HudKind.Event: Key(h, Keycode.SPACE, Modifiers.None); break;
+				case HudKind.Pause: Key(h, Keycode.PAUSE, Modifiers.None); break;
+				case HudKind.Add: AddMode = !AddMode; break;
+			}
+		}
+
+		static void Label(SpriteFont font, string text, float cx, float cy, Color c)
+		{
+			var m = font.Measure(text);
+			font.DrawTextWithShadow(text, new Vector2(cx - m.X / 2f, cy - m.Y / 2f), c, Color.Black, 1);
+		}
+
+		void DrawHud()
+		{
+			if (!Game.TouchHudActive)
+				return;
+
+			LayoutHud();
+			var rc = Game.Renderer.RgbaColorRenderer;
+			var fonts = Game.Renderer.Fonts;
+			var bold = fonts["Bold"];
+			var big = fonts["BigBold"];
+			var tiny = fonts["TinyBold"];
+			var now = SDL.SDL_GetTicks();
+			var white = Color.FromArgb(255, 255, 255, 255);
+			var gold = Color.FromArgb(255, 255, 215, 90);
+
+			for (var i = 0; i < hud.Count; i++)
+			{
+				var b = hud[i];
+				var pressed = mode == Mode.Hud && hudIndex == i;
+				var active = (b.Kind == HudKind.Add && AddMode) || (b.Kind == HudKind.Pause && Game.IsWorldPaused);
+				var count = b.Kind == HudKind.Group ? Game.ControlGroupSize(b.Index) : 0;
+
+				var fill = active ? Color.FromArgb(215, 190, 140, 25)
+					: pressed ? Color.FromArgb(215, 95, 95, 95)
+					: Color.FromArgb(150, 12, 12, 12);
+				var tl = new Vector3(b.X, b.Y, 0);
+				var br = new Vector3(b.X + b.W, b.Y + b.H, 0);
+				rc.FillRect(tl, br, fill);
+				rc.DrawRect(tl, br, 1.5f, active ? gold : Color.FromArgb(170, 220, 220, 220));
+
+				var cx = b.X + b.W / 2f;
+				var cy = b.Y + b.H / 2f;
+
+				switch (b.Kind)
+				{
+					case HudKind.Group:
+						Label(big, (b.Index + 1).ToString(), cx, cy - 2, count > 0 ? white : Color.FromArgb(120, 255, 255, 255));
+						if (count > 0)
+						{
+							var t = count.ToString();
+							var m = tiny.Measure(t);
+							tiny.DrawTextWithShadow(t, new Vector2(b.X + b.W - m.X - 3, b.Y + b.H - m.Y - 1), gold, Color.Black, 1);
+						}
+
+						if (pressed && !hudFired && order.Count > 0 && fingers.TryGetValue(order[0], out var fi))
+						{
+							var t01 = Math.Min(1f, (now - fi.StartTick) / (float)LongPressMs);
+							rc.FillRect(new Vector3(b.X, b.Y + b.H - 4, 0), new Vector3(b.X + b.W * t01, b.Y + b.H, 0), gold);
+						}
+
+						break;
+					case HudKind.SelectAll: Label(bold, "Всі", cx, cy, white); break;
+					case HudKind.Base: Label(bold, "База", cx, cy, white); break;
+					case HudKind.Event: Label(bold, "Подія", cx, cy, white); break;
+					case HudKind.Pause:
+					{
+						var bw = b.W * 0.14f;
+						var bh = b.H * 0.42f;
+						rc.FillRect(new Vector3(cx - bw * 1.6f, cy - bh / 2, 0), new Vector3(cx - bw * 0.6f, cy + bh / 2, 0), white);
+						rc.FillRect(new Vector3(cx + bw * 0.6f, cy - bh / 2, 0), new Vector3(cx + bw * 1.6f, cy + bh / 2, 0), white);
+						break;
+					}
+
+					case HudKind.Add:
+					{
+						var arm = b.W * 0.24f;
+						var th = b.W * 0.07f;
+						rc.FillRect(new Vector3(cx - arm, cy - th, 0), new Vector3(cx + arm, cy + th, 0), white);
+						rc.FillRect(new Vector3(cx - th, cy - arm, 0), new Vector3(cx + th, cy + arm, 0), white);
+						break;
+					}
+				}
+			}
+		}
+
 		public Sdl2Touch()
 		{
 			Game.TouchOverlay = DrawOverlay;
@@ -111,6 +317,7 @@ namespace OpenRA.Platforms.Default
 		// Ring that fills while a finger is held; full and bright once the long press is armed.
 		void DrawOverlay()
 		{
+			DrawHud();
 			if (lastToPos == null || fingers.Count != 1 || (mode != Mode.Pending && mode != Mode.LongPress))
 				return;
 
@@ -148,6 +355,8 @@ namespace OpenRA.Platforms.Default
 			return false;
 		}
 
+		static bool OverMinimap() => Ui.MouseOverWidget?.GetType().Name == "RadarWidget";
+
 		static bool OverWorld()
 		{
 			var n = Ui.MouseOverWidget?.GetType().Name;
@@ -161,6 +370,9 @@ namespace OpenRA.Platforms.Default
 
 		static void Send(IInputHandler h, MouseInputEvent ev, MouseButton btn, int2 pos, int2 delta, Modifiers mods, int taps = 0)
 		{
+			if (AddMode && OverWorld())
+				mods |= Modifiers.Shift;
+
 			try
 			{
 				h.OnMouseInput(new MouseInput(ev, btn, pos, delta, mods, taps));
@@ -183,6 +395,8 @@ namespace OpenRA.Platforms.Default
 		{
 			bits &= ~b;
 			Send(h, MouseInputEvent.Up, b, pos, int2.Zero, mods, MultiTapDetection.InfoFromMouse(Sdl(b)));
+			if (b == MouseButton.Left && AddMode && OverWorld())
+				AddMode = false;
 		}
 
 		const int SnapRadius = 26;
@@ -298,17 +512,33 @@ namespace OpenRA.Platforms.Default
 
 					if (fingers.Count == 1)
 					{
-						mode = Mode.Pending;
 						lastX = x;
 						lastY = y;
+						hudIndex = HudHit(P(x, y));
+						if (hudIndex >= 0)
+						{
+							mode = Mode.Hud;
+							hudFired = false;
+							break;
+						}
+
+						mode = Mode.Pending;
 						Send(h, MouseInputEvent.Move, MouseButton.None, P(x, y), int2.Zero, mods);
 					}
 					else if (fingers.Count == 2)
 					{
+						if (mode == Mode.Hud)
+						{
+							// A second finger cancels a half-made button press.
+							hudIndex = -1;
+							mode = Mode.Ignore;
+							break;
+						}
+
 						if (mode == Mode.Drag)
 							Up(h, MouseButton.Left, P(lastX, lastY), mods);
 						else if (mode == Mode.PanDrag)
-							Up(h, MouseButton.Middle, P(lastX, lastY), mods);
+							Up(h, panBtn, P(lastX, lastY), mods);
 
 						mode = Mode.Multi;
 						panning = false;
@@ -332,6 +562,19 @@ namespace OpenRA.Platforms.Default
 					fi.X = x;
 					fi.Y = y;
 
+					if (mode == Mode.Hud)
+					{
+						var hx = x - fi.StartX;
+						var hy = y - fi.StartY;
+						if (hx * hx + hy * hy > slop * slop * 4)
+						{
+							hudIndex = -1;
+							mode = Mode.Ignore;
+						}
+
+						break;
+					}
+
 					if (mode == Mode.Pending || mode == Mode.LongPress)
 					{
 						var dx = x - fi.StartX;
@@ -353,11 +596,19 @@ namespace OpenRA.Platforms.Default
 								mode = Mode.ScrollDrag;
 								scrollAccum = 0;
 							}
+							else if (OverMinimap())
+							{
+								// Dragging on the minimap scrubs the camera (the radar moves the view on its non-order button).
+								mode = Mode.PanDrag;
+								panBtn = MouseButton.Right;
+								Down(h, panBtn, start, mods);
+							}
 							else if (OverWorld())
 							{
 								// Drag on the battlefield moves the camera (scroll button + "Standard" scroll type).
 								mode = Mode.PanDrag;
-								Down(h, MouseButton.Middle, start, mods);
+								panBtn = MouseButton.Middle;
+								Down(h, panBtn, start, mods);
 							}
 							else
 							{
@@ -458,7 +709,14 @@ namespace OpenRA.Platforms.Default
 					if (!Game.IsPlacingBuilding)
 						placePending = false;
 
-					if (mode == Mode.Pending && fingers.Count == 1)
+					if (mode == Mode.Hud && fingers.Count == 1)
+					{
+						if (hudIndex >= 0 && hudIndex < hud.Count && !hudFired)
+							HudTap(h, hud[hudIndex]);
+
+						hudIndex = -1;
+					}
+					else if (mode == Mode.Pending && fingers.Count == 1)
 					{
 						var placingOnWorld = false;
 						if (Game.IsPlacingBuilding)
@@ -480,6 +738,7 @@ namespace OpenRA.Platforms.Default
 								Down(h, MouseButton.Left, at, mods);
 								Up(h, MouseButton.Left, at, mods);
 								placePending = false;
+								Game.TouchHaptic?.Invoke(30);
 							}
 							else
 							{
@@ -489,6 +748,11 @@ namespace OpenRA.Platforms.Default
 								placeY = fi.StartY;
 								placePending = true;
 							}
+						}
+						else if (OverMinimap())
+						{
+							// On the minimap a plain tap jumps the camera there (orders need a long press).
+							Click(h, MouseButton.Right, P(fi.StartX, fi.StartY), mods);
 						}
 						else
 						{
@@ -512,12 +776,12 @@ namespace OpenRA.Platforms.Default
 						}
 					}
 					else if (mode == Mode.PanDrag && fingers.Count == 1)
-						Up(h, MouseButton.Middle, P(x, y), mods);
+						Up(h, panBtn, P(x, y), mods);
 					else if (mode == Mode.ScrollDrag)
 					{
 					}
 					else if (mode == Mode.LongPress && fingers.Count == 1)
-						Click(h, MouseButton.Right, P(fi.StartX, fi.StartY), mods);
+						Click(h, OverMinimap() ? MouseButton.Left : MouseButton.Right, P(fi.StartX, fi.StartY), mods);
 					else if (mode == Mode.PlaceDrag && fingers.Count == 1)
 					{
 						// Leave the ghost where it is; tap near it to confirm.
@@ -538,6 +802,7 @@ namespace OpenRA.Platforms.Default
 					order.Remove(f.fingerId);
 					if (fingers.Count == 0)
 					{
+						hudIndex = -1;
 						mode = Mode.Idle;
 						panning = false;
 						bits = MouseButton.None;
@@ -552,6 +817,19 @@ namespace OpenRA.Platforms.Default
 		public void Tick(Sdl2PlatformWindow device, IInputHandler h, Modifiers mods, Func<int, int, int2> toPos)
 		{
 			lastToPos = toPos;
+
+			// Holding a group button assigns the current selection to that group.
+			if (mode == Mode.Hud && fingers.Count == 1 && hudIndex >= 0 && hudIndex < hud.Count && !hudFired
+				&& hud[hudIndex].Kind == HudKind.Group
+				&& SDL.SDL_GetTicks() - fingers[order[0]].StartTick >= LongPressMs)
+			{
+				hudFired = true;
+				Game.TouchHaptic?.Invoke(45);
+				Key(h, GroupKey(hud[hudIndex].Index), Modifiers.Ctrl);
+				Log($"hud group {hud[hudIndex].Index + 1} assigned");
+				return;
+			}
+
 			if (mode != Mode.Pending || fingers.Count != 1)
 				return;
 
@@ -561,6 +839,7 @@ namespace OpenRA.Platforms.Default
 
 			// Armed: releasing without moving is a right click, dragging draws a selection box.
 			mode = Mode.LongPress;
+			Game.TouchHaptic?.Invoke(20);
 			Log("long press armed");
 		}
 	}

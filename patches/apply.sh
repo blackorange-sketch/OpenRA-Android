@@ -131,6 +131,40 @@ patch(
     "\t\tpublic static bool IsPlacingBuilding =>\n",
     "\t\tpublic static Action TouchOverlay;\n\n\t\tpublic static bool IsPlacingBuilding =>\n",
 )
+
+# 9. State the on-screen touch buttons need: whether to show them, group sizes, pause state, and a haptics hook
+#    the Android host fills in.
+patch(
+    "OpenRA.Game/Game.cs",
+    "\t\tpublic static Action TouchOverlay;\n",
+    "\t\tpublic static Action TouchOverlay;\n\n"
+    "\t\t/// <summary>Android host hook: vibrate for the given number of milliseconds.</summary>\n"
+    "\t\tpublic static Action<int> TouchHaptic;\n\n"
+    "\t\tpublic static bool IsWorldPaused => worldRenderer?.World?.Paused == true;\n\n"
+    "\t\t/// <summary>True while a normal game is being played (not a menu, shellmap, editor, replay or finished game).</summary>\n"
+    "\t\tpublic static bool TouchHudActive\n"
+    "\t\t{\n"
+    "\t\t\tget\n"
+    "\t\t\t{\n"
+    "\t\t\t\tvar w = worldRenderer?.World;\n"
+    "\t\t\t\tif (w == null || w.Type != WorldType.Regular || w.LocalPlayer == null || w.IsLoadingGameSave || w.IsGameOver)\n"
+    "\t\t\t\t\treturn false;\n\n"
+    "\t\t\t\tvar menu = Ui.Root?.GetOrNull(\"MENU_ROOT\");\n"
+    "\t\t\t\tif (menu != null)\n"
+    "\t\t\t\t\tforeach (var c in menu.Children)\n"
+    "\t\t\t\t\t\tif (c.IsVisible())\n"
+    "\t\t\t\t\t\t\treturn false;\n\n"
+    "\t\t\t\treturn true;\n"
+    "\t\t\t}\n"
+    "\t\t}\n\n"
+    "\t\tpublic static int ControlGroupSize(int group)\n"
+    "\t\t{\n"
+    "\t\t\tvar groups = worldRenderer?.World?.ControlGroups;\n"
+    "\t\t\tif (groups == null || group < 0 || group >= groups.Groups.Length)\n"
+    "\t\t\t\treturn 0;\n\n"
+    "\t\t\treturn groups.GetActorsInControlGroup(group).Count();\n"
+    "\t\t}\n",
+)
 PY
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"

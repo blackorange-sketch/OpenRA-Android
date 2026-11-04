@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using Android.Content;
+using Android.OS;
 using Android.Util;
 
 namespace OpenRAHost
@@ -33,6 +35,25 @@ namespace OpenRAHost
 
 		[DllImport("SDL2")]
 		static extern int SDL_SetHint([MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
+
+		static Vibrator vibrator;
+
+		// Short vibration for touch feedback (long press armed, button pressed, building confirmed).
+		static void Vibrate(int ms)
+		{
+			try
+			{
+				vibrator ??= (Vibrator)Android.App.Application.Context.GetSystemService(Context.VibratorService);
+				if (vibrator == null || !vibrator.HasVibrator)
+					return;
+
+				vibrator.Vibrate(VibrationEffect.CreateOneShot(ms, VibrationEffect.DefaultAmplitude));
+			}
+			catch
+			{
+				// Haptics are a nicety; never let them break input.
+			}
+		}
 
 		public static void Configure(string engineRoot, string filesRoot, string scale, string inGameScale, int touchOffset)
 		{
@@ -78,6 +99,8 @@ namespace OpenRAHost
 					"Game.UseAlternateScrollButton=True",
 					"Game.ViewportEdgeScroll=False"
 				};
+
+				OpenRA.Game.TouchHaptic = Vibrate;
 
 				Log.Info(Tag, "Starting OpenRA with " + string.Join(" ", args));
 				return (int)OpenRA.Game.InitializeAndRun(args);
