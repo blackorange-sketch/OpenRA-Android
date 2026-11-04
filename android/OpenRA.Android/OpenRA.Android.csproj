@@ -25,6 +25,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<!-- Mono GC tuning (fewer, shorter pauses in big battles) -->
+		<AndroidEnvironment Include="environment.txt" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\..\openra\OpenRA.Game\OpenRA.Game.csproj" />
 	</ItemGroup>
 

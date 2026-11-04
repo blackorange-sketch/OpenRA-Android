@@ -52,6 +52,19 @@ namespace OpenRAHost
 			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutInt("touch_dy", Math.Clamp(value, -60, 150)).Apply();
 		}
 
+		// 0 = no cap (follows the display refresh rate).
+		int FpsCap
+		{
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetInt("fps_cap", 60);
+			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutInt("fps_cap", value).Apply();
+		}
+
+		bool ShowFps
+		{
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetBoolean("show_fps", false);
+			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutBoolean("show_fps", value).Apply();
+		}
+
 		string FilesRoot => FilesDir.AbsolutePath;
 
 		protected override void OnCreate(Bundle savedInstanceState)
@@ -192,6 +205,16 @@ namespace OpenRAHost
 					false, true, () => { VoiceFolder = russian ? "GAMESFX" : "GAMESFXRus"; BuildMain(); }),
 					ButtonParams(Dp(10)));
 				card.AddView(MakeText("Озвучка застосовується при наступному імпорті файлів.", 12, Dim));
+
+				var cap = FpsCap;
+				card.AddView(MakeButton("Ліміт кадрів: " + (cap == 0 ? "без ліміту" : cap + " FPS") + "  — змінити",
+					false, true, () => { FpsCap = cap == 60 ? 30 : cap == 30 ? 0 : 60; BuildMain(); }),
+					ButtonParams(Dp(10)));
+				var fps = ShowFps;
+				card.AddView(MakeButton("Лічильник FPS у грі: " + (fps ? "увімкнено" : "вимкнено") + "  — змінити",
+					false, true, () => { ShowFps = !fps; BuildMain(); }),
+					ButtonParams(Dp(10)));
+				card.AddView(MakeText("Нижчий ліміт менше гріє телефон і стабілізує кадри.", 12, Dim));
 
 				var diag = MakeButton("Діагностика", false, true,
 					() => ShowReport(engineError ?? DiagnosticsReport.BuildAlways(FilesRoot), false));
@@ -337,7 +360,7 @@ namespace OpenRAHost
 
 			// A crash file from an earlier run must not be reported as the result of this one.
 			DiagnosticsReport.Clear(FilesRoot);
-			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy);
+			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy, FpsCap, ShowFps);
 
 			var intent = new Intent();
 			intent.SetClassName(this, "org.openra.android.OpenRAActivity");

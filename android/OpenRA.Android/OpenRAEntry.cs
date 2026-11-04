@@ -25,6 +25,8 @@ namespace OpenRAHost
 		static string uiScale = "1";
 		static string gameScale = "1";
 		static int touchDy;
+		static int fpsCap = 60;
+		static bool showFps;
 
 		[DllImport("openramain")]
 		static extern void OpenRA_SetMain(IntPtr fn);
@@ -54,8 +56,10 @@ namespace OpenRAHost
 			}
 		}
 
-		public static void Configure(string engineRoot, string filesRoot, string scale, string inGameScale, int touchOffset)
+		public static void Configure(string engineRoot, string filesRoot, string scale, string inGameScale, int touchOffset, int frameCap, bool perfText)
 		{
+			fpsCap = frameCap;
+			showFps = perfText;
 			uiScale = scale;
 			gameScale = inGameScale;
 			touchDy = touchOffset;
@@ -96,7 +100,10 @@ namespace OpenRAHost
 					"Game.MouseScroll=Standard",
 					"Game.MouseControlStyle=Classic",
 					"Game.UseAlternateScrollButton=True",
-					"Game.ViewportEdgeScroll=False"
+					"Game.ViewportEdgeScroll=False",
+					"Graphics.CapFramerate=" + (fpsCap > 0 ? "True" : "False"),
+					"Graphics.MaxFramerate=" + (fpsCap > 0 ? fpsCap : 120),
+					"Debug.PerfText=" + (showFps ? "True" : "False")
 				};
 
 				OpenRA.Game.TouchHaptic = Vibrate;
