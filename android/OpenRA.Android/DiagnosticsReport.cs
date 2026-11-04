@@ -38,7 +38,7 @@ namespace OpenRAHost
 			var sb = new StringBuilder();
 			sb.AppendLine(head);
 
-			foreach (var name in new[] { "graphics.log", "exception.log", "debug.log" })
+			foreach (var name in new[] { "touch.log", "graphics.log", "exception.log", "debug.log" })
 			{
 				var path = Path.Combine(filesRoot, "support", "Logs", name);
 				if (!File.Exists(path))
@@ -46,6 +46,16 @@ namespace OpenRAHost
 
 				var lines = ReadSafe(path).Split('\n');
 				sb.AppendLine();
+				if (name == "touch.log")
+				{
+					// Geometry is logged first, the most recent taps last.
+					sb.AppendLine("--- touch.log (geometry + last taps) ---");
+					var picked = lines.Take(3).Concat(lines.Skip(Math.Max(3, lines.Length - 30)));
+					foreach (var line in picked)
+						sb.AppendLine(line.TrimEnd('\r'));
+					continue;
+				}
+
 				sb.AppendLine("--- " + name + " (last " + TailLines + " lines) ---");
 				foreach (var line in lines.Skip(Math.Max(0, lines.Length - TailLines)))
 					sb.AppendLine(line.TrimEnd('\r'));

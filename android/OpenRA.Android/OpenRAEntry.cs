@@ -51,6 +51,11 @@ namespace OpenRAHost
 			{
 				Environment.SetEnvironmentVariable("OPENRA_BIN_DIR", Path.Combine(engineDir, "bin"));
 				SDL_SetMainReady();
+				var logDir = Path.Combine(supportDir, "Logs");
+				Directory.CreateDirectory(logDir);
+				var touchLog = Path.Combine(logDir, "touch.log");
+				try { File.Delete(touchLog); } catch { }
+				Environment.SetEnvironmentVariable("OPENRA_TOUCH_LOG", touchLog);
 				Environment.SetEnvironmentVariable("OPENRA_UI_SCALE_MENU", uiScale);
 				Environment.SetEnvironmentVariable("OPENRA_UI_SCALE_GAME", gameScale);
 				Environment.SetEnvironmentVariable("OPENRA_TOUCH_DY", touchDy.ToString(System.Globalization.CultureInfo.InvariantCulture));

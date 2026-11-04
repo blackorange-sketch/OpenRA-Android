@@ -9,6 +9,7 @@
 //   pinch                  zoom (mouse wheel)
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using OpenRA.Widgets;
 using SDL2;
@@ -27,6 +28,57 @@ namespace OpenRA.Platforms.Default
 
 		// Vertical calibration in physical pixels (set in the launcher): positive moves the touch point up.
 		static readonly int TouchDy = int.TryParse(Environment.GetEnvironmentVariable("OPENRA_TOUCH_DY"), out var dy) ? dy : 0;
+
+		static readonly string LogPath = Environment.GetEnvironmentVariable("OPENRA_TOUCH_LOG");
+		static int logged;
+		bool geometryLogged;
+
+		static void Log(string line)
+		{
+			if (string.IsNullOrEmpty(LogPath) || logged > 600)
+				return;
+
+			logged++;
+			try
+			{
+				File.AppendAllText(LogPath, line + "\n");
+			}
+			catch
+			{
+				// Logging must never break input.
+			}
+		}
+
+		static string WidgetInfo()
+		{
+			var w = Ui.MouseOverWidget;
+			if (w == null)
+				return "none";
+
+			var r = w.EventBounds;
+			return $"{w.GetType().Name}#{w.Id} [{r.X},{r.Y} {r.Width}x{r.Height}]";
+		}
+
+		void LogGeometry(Sdl2PlatformWindow device)
+		{
+			geometryLogged = true;
+			Log($"geometry: SurfaceSize={device.SurfaceSize} EffectiveWindowSize={device.EffectiveWindowSize} " +
+				$"EffectiveScale={device.EffectiveWindowScale} NativeScale={device.NativeWindowScale} TouchDy={TouchDy}");
+			try
+			{
+				var win = SDL.SDL_GL_GetCurrentWindow();
+				SDL.SDL_GetWindowSize(win, out var ww, out var wh);
+				SDL.SDL_GL_GetDrawableSize(win, out var dw, out var dh);
+				SDL.SDL_GetWindowPosition(win, out var wx, out var wy);
+				SDL.SDL_GetDisplayBounds(0, out var db);
+				SDL.SDL_GetDisplayUsableBounds(0, out var ub);
+				Log($"sdl: window={ww}x{wh}@{wx},{wy} drawable={dw}x{dh} display={db.w}x{db.h} usable={ub.x},{ub.y} {ub.w}x{ub.h}");
+			}
+			catch (Exception e)
+			{
+				Log("sdl geometry failed: " + e.Message);
+			}
+		}
 
 		const uint LongPressMs = 400;
 		const uint SecondTapMs = 300;
@@ -141,10 +193,12 @@ namespace OpenRA.Platforms.Default
 
 		void Click(IInputHandler h, MouseButton b, int2 pos, Modifiers mods)
 		{
+			var before = pos;
 			if (b == MouseButton.Left)
 				pos = Snap(pos);
 
 			Send(h, MouseInputEvent.Move, MouseButton.None, pos, int2.Zero, mods);
+			Log($"click {b} pos={before} snapped={pos} over={WidgetInfo()}");
 			Down(h, b, pos, mods);
 			Up(h, b, pos, mods);
 		}
@@ -170,10 +224,14 @@ namespace OpenRA.Platforms.Default
 			var y = Math.Max(0, f.y * height - TouchDy);
 			int2 P(float px, float py) => toPos((int)px, (int)py);
 
+			if (!geometryLogged)
+				LogGeometry(device);
+
 			switch (e.type)
 			{
 				case SDL.SDL_EventType.SDL_FINGERDOWN:
 				{
+					Log($"down raw=({f.x:0.000},{f.y:0.000}) phys=({x:0},{y:0}) pos={P(x, y)} fingers={fingers.Count + 1}");
 					fingers[f.fingerId] = new Finger { X = x, Y = y, StartX = x, StartY = y, StartTick = SDL.SDL_GetTicks() };
 					order.Add(f.fingerId);
 
@@ -324,6 +382,7 @@ namespace OpenRA.Platforms.Default
 							else
 							{
 								// First tap: only show where it would be built.
+								Log($"place-ghost pos={P(fi.StartX, fi.StartY)} over={WidgetInfo()}");
 								placeX = fi.StartX;
 								placeY = fi.StartY;
 								placePending = true;
