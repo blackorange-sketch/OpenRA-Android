@@ -110,7 +110,16 @@ namespace OpenRA.Platforms.Default
 
 		static void Send(IInputHandler h, MouseInputEvent ev, MouseButton btn, int2 pos, int2 delta, Modifiers mods, int taps = 0)
 		{
-			h.OnMouseInput(new MouseInput(ev, btn, pos, delta, mods, taps));
+			try
+			{
+				h.OnMouseInput(new MouseInput(ev, btn, pos, delta, mods, taps));
+			}
+			catch (InvalidOperationException e)
+			{
+				// Two taps in quick succession can reach a widget while its previous dialog is still closing
+				// (e.g. "attach a panel to an open dropdown"). Dropping that tap is harmless; crashing is not.
+				Log("input ignored: " + e.Message);
+			}
 		}
 
 		void Down(IInputHandler h, MouseButton b, int2 pos, Modifiers mods)
