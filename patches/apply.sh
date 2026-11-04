@@ -99,7 +99,11 @@ patch(
     "\t\t\t// Android host: separate UI scales for menus and for a running game.\n"
     "\t\t\tvar hostScale = Environment.GetEnvironmentVariable(type == WorldType.Regular ? \"OPENRA_UI_SCALE_GAME\" : \"OPENRA_UI_SCALE_MENU\");\n"
     "\t\t\tif (float.TryParse(hostScale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var hostScaleValue))\n"
-    "\t\t\t\tRenderer.SetUIScale(hostScaleValue);\n\n",
+    "\t\t\t{\n"
+    "\t\t\t\tRenderer.SetUIScale(hostScaleValue);\n"
+    "\t\t\t\t// Viewport math (world <-> screen, selection boxes, picking) reads the saved setting, so keep it in sync.\n"
+    "\t\t\t\tSettings.Graphics.UIScale = hostScaleValue;\n"
+    "\t\t\t}\n\n",
 )
 
 # 8. Hook that lets the touch layer draw feedback (long-press ring) on top of the UI.
