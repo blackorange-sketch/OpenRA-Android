@@ -2,16 +2,17 @@
 """Builds content-manifest.txt (kind<TAB>dest path) from OpenRA's d2k installer definition."""
 import re, sys
 
-src, out = sys.argv[1], sys.argv[2]
+out, sources = sys.argv[1], sys.argv[2:]
 entries = {}
 pattern = re.compile(r"^\s*\^SupportDir\|Content/d2k/v3/(.+?):\s*(\S+)\s*$")
-with open(src, encoding="utf-8") as f:
-    for line in f:
-        m = pattern.match(line.rstrip("\n"))
-        if m:
-            dest = m.group(1).strip()
-            entries[dest] = ("movies" if dest.startswith("Movies/")
-                             else "music" if dest.startswith("Music/") else "base")
+for src in sources:
+    with open(src, encoding="utf-8") as f:
+        for line in f:
+            m = pattern.match(line.rstrip("\n"))
+            if m:
+                dest = m.group(1).strip()
+                entries[dest] = ("movies" if dest.startswith("Movies/")
+                                 else "music" if dest.startswith("Music/") else "base")
 counts = {k: sum(1 for v in entries.values() if v == k) for k in ("base", "movies", "music")}
 print("manifest entries:", counts)
 if not entries:

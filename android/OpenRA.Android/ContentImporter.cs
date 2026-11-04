@@ -27,7 +27,7 @@ namespace OpenRAHost
 		static readonly string[] Required =
 		{
 			"BLOXBASE.R16", "BLOXBAT.R16", "BLOXBGBS.R16", "BLOXICE.R16",
-			"BLOXTREE.R16", "BLOXWAST.R16", "SOUND.RS", "PALETTE.BIN"
+			"BLOXTREE.R16", "BLOXWAST.R16", "SOUND.RS", "PALETTE.BIN", "DATA.R16"
 		};
 
 		public static string ContentDir(string filesRoot) => Path.Combine(filesRoot, "support", "Content", "d2k", "v3");

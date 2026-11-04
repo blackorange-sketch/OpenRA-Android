@@ -48,7 +48,8 @@ echo "==> Assemblies requested by the d2k mod manifest:"
 grep -A8 '^Assemblies:' "$OPENRA/mods/d2k/mod.yaml" || true
 
 mkdir -p "$ASSETS"
-python3 "$ROOT/scripts/gen-manifest.py" "$OPENRA/mods/d2k-content/installer/d2k.yaml" "$ASSETS/content-manifest.txt"
+python3 "$ROOT/scripts/gen-manifest.py" "$ASSETS/content-manifest.txt" \
+	"$OPENRA/mods/d2k-content/installer/d2k.yaml" "$OPENRA/mods/d2k-content/installer/gruntmods.yaml"
 python3 - "$STAGE" "$ASSETS" <<'PY'
 import hashlib, os, sys, zipfile
 

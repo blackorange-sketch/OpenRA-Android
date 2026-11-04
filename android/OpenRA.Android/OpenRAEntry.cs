@@ -29,6 +29,9 @@ namespace OpenRAHost
 		[DllImport("SDL2")]
 		static extern void SDL_SetMainReady();
 
+		[DllImport("SDL2")]
+		static extern int SDL_SetHint([MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
+
 		public static void Configure(string engineRoot, string filesRoot, string scale)
 		{
 			uiScale = scale;
@@ -44,6 +47,10 @@ namespace OpenRAHost
 			{
 				Environment.SetEnvironmentVariable("OPENRA_BIN_DIR", Path.Combine(engineDir, "bin"));
 				SDL_SetMainReady();
+
+				// SDL otherwise rotates the activity to match the (portrait) desktop size when it creates
+				// the window, which produced a cropped, mis-sized game view. Keep it landscape.
+				SDL_SetHint("SDL_IOS_ORIENTATIONS", "LandscapeLeft LandscapeRight");
 
 				var args = new[]
 				{
