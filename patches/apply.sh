@@ -49,4 +49,11 @@ patch(
     "\t\t\t\treturn LoadFromAssemblyPath(sideBySide);\n\n"
     "\t\t\treturn null;\n",
 )
+
+# 4. Mono on Android does not support changing the LOH compaction mode (throws PlatformNotSupportedException).
+patch(
+    "OpenRA.Game/Game.cs",
+    "GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;",
+    "try { GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce; } catch (PlatformNotSupportedException) { }",
+)
 PY
