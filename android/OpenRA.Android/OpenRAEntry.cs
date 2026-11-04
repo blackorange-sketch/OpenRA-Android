@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Android.Content;
-using Android.OS;
 using Android.Util;
 
 namespace OpenRAHost
@@ -36,18 +35,18 @@ namespace OpenRAHost
 		[DllImport("SDL2")]
 		static extern int SDL_SetHint([MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
 
-		static Vibrator vibrator;
+		static Android.OS.Vibrator vibrator;
 
 		// Short vibration for touch feedback (long press armed, button pressed, building confirmed).
 		static void Vibrate(int ms)
 		{
 			try
 			{
-				vibrator ??= (Vibrator)Android.App.Application.Context.GetSystemService(Context.VibratorService);
+				vibrator ??= (Android.OS.Vibrator)Android.App.Application.Context.GetSystemService(Context.VibratorService);
 				if (vibrator == null || !vibrator.HasVibrator)
 					return;
 
-				vibrator.Vibrate(VibrationEffect.CreateOneShot(ms, VibrationEffect.DefaultAmplitude));
+				vibrator.Vibrate(Android.OS.VibrationEffect.CreateOneShot(ms, Android.OS.VibrationEffect.DefaultAmplitude));
 			}
 			catch
 			{
