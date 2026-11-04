@@ -84,6 +84,11 @@ namespace OpenRAHost
 			finally
 			{
 				OpenRA.Log.Dispose();
+
+				// OpenRA keeps process-wide static state (engine dir, settings, ...) and cannot be started a
+				// second time in the same process, so a finished game ends the process. The next launch
+				// from the icon starts clean.
+				Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
 			}
 		}
 	}
