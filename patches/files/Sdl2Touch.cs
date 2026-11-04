@@ -144,7 +144,7 @@ namespace OpenRA.Platforms.Default
 			const int Actions = 5;
 			var total = GroupButtons + Actions;
 			var avail = res.Width * 0.74f; // stay clear of the sidebar on the right
-			var size = Math.Min(res.Height * 0.115f, avail / (total + (total - 2) * GapF + SplitF));
+			var size = Math.Min(res.Height * 0.085f, avail / (total + (total - 2) * GapF + SplitF));
 			var gap = size * GapF;
 			var width = total * size + (total - 2) * gap + SplitF * size;
 			var x = Math.Max(res.Height * 0.16f, (avail - width) / 2);
@@ -175,7 +175,7 @@ namespace OpenRA.Platforms.Default
 				return -1;
 
 			LayoutHud();
-			const int Pad = 4;
+			const int Pad = 6;
 			for (var i = 0; i < hud.Count; i++)
 			{
 				var b = hud[i];

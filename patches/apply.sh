@@ -234,6 +234,48 @@ patch(
     "\t\t\t\t\t&& (string.IsNullOrEmpty(campaignFilter) || (map.Title != null && map.Title.StartsWith(campaignFilter, StringComparison.Ordinal))))\n",
 )
 
+# Mission text sits just below the touch button row.
+patch(
+    "mods/common/chrome/ingame.yaml",
+    "\t\t\t\tLabel@MISSION_TEXT:\n\t\t\t\t\tX: WINDOW_WIDTH / 2 - 256\n\t\t\t\t\tY: 23\n",
+    "\t\t\t\tLabel@MISSION_TEXT:\n\t\t\t\t\tX: WINDOW_WIDTH / 2 - 256\n\t\t\t\t\tY: 44\n",
+)
+
+# 11. Campaign flow: record results, play defeat / ending videos, reopen on the next mission.
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Ingame/LoadIngamePlayerOrObserverUILogic.cs",
+    "\t\t\t\t\t\tvar video = world.LocalPlayer.WinState == WinState.Won ? missionData.WinVideo : missionData.LossVideo;\n",
+    "\t\t\t\t\t\tvar won = world.LocalPlayer.WinState == WinState.Won;\n"
+    "\t\t\t\t\t\tvar video = won ? missionData.WinVideo : missionData.LossVideo;\n"
+    "\t\t\t\t\t\tif (string.IsNullOrEmpty(video))\n"
+    "\t\t\t\t\t\t\tvideo = CampaignProgress.EndVideo(world.Map.Title, won);\n\n"
+    "\t\t\t\t\t\tCampaignProgress.RecordResult(world.Map.Title, won);\n",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/MainMenuLogic.cs",
+    "\t\t\t\tcase MenuPanel.Missions:\n\t\t\t\t\tOpenMissionBrowserPanel(null);\n",
+    "\t\t\t\tcase MenuPanel.Missions:\n\t\t\t\t\tOpenMissionBrowserPanel(CampaignProgress.TakeNextMapUid());\n",
+)
+patch(
+    CB,
+    "\t\t\tRebuildList();\n\n\t\t\tforeach (var (tabId",
+    "\t\t\tRebuildList();\n\n"
+    "\t\t\tif (CampaignProgress.TakeAutoBriefing())\n"
+    "\t\t\t\tGame.RunAfterDelay(700, () =>\n"
+    "\t\t\t\t{\n"
+    "\t\t\t\t\tif (startBriefingVideoButton.IsVisible() && !startBriefingVideoButton.IsDisabled() && startBriefingVideoButton.OnClick != null)\n"
+    "\t\t\t\t\t\tstartBriefingVideoButton.OnClick();\n"
+    "\t\t\t\t});\n\n"
+    "\t\t\tforeach (var (tabId",
+)
+patch(
+    CB,
+    "\t\t\t\tvar label = item.Get<LabelWithTooltipWidget>(\"TITLE\");\n",
+    "\t\t\t\tvar label = item.Get<LabelWithTooltipWidget>(\"TITLE\");\n"
+    "\t\t\t\tvar normalColor = label.GetColor();\n"
+    "\t\t\t\tlabel.GetColor = () => CampaignProgress.IsDone(preview.Title) ? OpenRA.Primitives.Color.FromArgb(255, 120, 230, 120) : normalColor;\n",
+)
+
 CY = "mods/d2k/chrome/missionbrowser.yaml"
 patch(
     CY,
@@ -253,3 +295,4 @@ patch(
 PY
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"
+cp "$(dirname "$0")/files/CampaignProgress.cs" "$OPENRA/OpenRA.Mods.Common/CampaignProgress.cs"
