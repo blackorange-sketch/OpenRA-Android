@@ -32,7 +32,7 @@ Pinned engine: `OpenRA/OpenRA` commit `9636b63eaee62fcb60ef2e896e7985bdf2f1ee68`
 ```
 OPENRA_REF            pinned OpenRA commit
 scripts/              native library build scripts (NDK)
-android/              .NET for Android host project
+android/              .NET for Android host project (no .java files in here, see build-java.sh)
 patches/              patches applied on top of OpenRA
 .github/workflows/    APK build
 ```

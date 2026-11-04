@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Compiles SDL's Java sources plus our activity into a jar that the .NET
-# Android project embeds (AndroidJavaLibrary). Run build-native.sh first.
+# Compiles SDL's Java sources plus our activity (native/java) into a jar that the .NET
+# Android project packages with <AndroidLibrary Bind="false">. The Java sources must stay
+# outside the project directory: .NET auto-includes **/*.java there as bound AndroidJavaSource. Run build-native.sh first.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +17,7 @@ JAVA_SRC="$ROOT/native-build/sdl-java"
 CLASSES="$ROOT/native-build/java-classes"
 rm -rf "$CLASSES"; mkdir -p "$CLASSES"
 
-mapfile -t FILES < <(find "$JAVA_SRC" "$ROOT/android/OpenRA.Android/java" -name '*.java' | sort)
+mapfile -t FILES < <(find "$JAVA_SRC" "$ROOT/native/java" -name '*.java' | sort)
 javac -nowarn -source 8 -target 8 -classpath "$ANDROID_JAR" -d "$CLASSES" "${FILES[@]}"
 
 JAR="$ROOT/android/OpenRA.Android/libs/openra-java.jar"
