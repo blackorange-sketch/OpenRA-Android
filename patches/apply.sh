@@ -61,6 +61,20 @@ patch(
 #    events into the mouse input OpenRA expects.
 patch(
     "OpenRA.Platforms.Default/Sdl2Input.cs",
+    "\t\t\twhile (SDL.SDL_PollEvent(out var e) != 0)\n\t\t\t{\n",
+    "\t\t\twhile (SDL.SDL_PollEvent(out var e) != 0)\n\t\t\t{\n"
+    "\t\t\t\t// Mouse events synthesised from touches (which == SDL_TOUCH_MOUSEID) would duplicate every tap.\n"
+    "\t\t\t\tif ((e.type == SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN || e.type == SDL.SDL_EventType.SDL_MOUSEBUTTONUP\n"
+    "\t\t\t\t\t|| e.type == SDL.SDL_EventType.SDL_MOUSEMOTION || e.type == SDL.SDL_EventType.SDL_MOUSEWHEEL)\n"
+    "\t\t\t\t\t&& e.button.which == uint.MaxValue)\n"
+    "\t\t\t\t{\n"
+    "\t\t\t\t\tif (e.type == SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN)\n"
+    "\t\t\t\t\t\tSdl2Touch.LogLine(\"ignored SDL touch-mouse button down\");\n"
+    "\t\t\t\t\tcontinue;\n"
+    "\t\t\t\t}\n\n",
+)
+patch(
+    "OpenRA.Platforms.Default/Sdl2Input.cs",
     "\t\tMouseButton lastButtonBits = MouseButton.None;\n",
     "\t\tMouseButton lastButtonBits = MouseButton.None;\n\t\treadonly Sdl2Touch touch = new();\n",
 )
@@ -118,8 +132,5 @@ patch(
     "\t\tpublic static Action TouchOverlay;\n\n\t\tpublic static bool IsPlacingBuilding =>\n",
 )
 PY
-
-# 9. Finger-sized in-game command bar.
-python3 "$(dirname "$0")/touch-ui.py" "$OPENRA"
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"

@@ -35,6 +35,8 @@ namespace OpenRA.Platforms.Default
 		static int logged;
 		bool geometryLogged;
 
+		internal static void LogLine(string line) => Log(line);
+
 		static void Log(string line)
 		{
 			if (string.IsNullOrEmpty(LogPath) || logged > 600)
