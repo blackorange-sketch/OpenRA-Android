@@ -165,6 +165,91 @@ patch(
     "\t\t\treturn groups.GetActorsInControlGroup(group).Count();\n"
     "\t\t}\n",
 )
+# 10. Mission browser: one tab per house (the stock screen is a single long list of all campaigns).
+CB = "OpenRA.Mods.Common/Widgets/Logic/MissionBrowserLogic.cs"
+patch(
+    CB,
+    "\t\tbool minifiedOptions = true;\n",
+    "\t\tbool minifiedOptions = true;\n\t\tstring campaignFilter = \"Atreides\";\n",
+)
+patch(
+    CB,
+    "\t\t\tvar allPreviews = new List<MapPreview>();\n\t\t\tmissionList.RemoveChildren();\n",
+    "\t\t\tif (initialMap != null)\n"
+    "\t\t\t{\n"
+    "\t\t\t\tvar initialUid = modData.MapCache.GetUpdatedMap(initialMap);\n"
+    "\t\t\t\tvar initialPreview = initialUid == null ? null : modData.MapCache[initialUid];\n"
+    "\t\t\t\tif (initialPreview != null)\n"
+    "\t\t\t\t\tforeach (var house in new[] { \"Atreides\", \"Harkonnen\", \"Ordos\" })\n"
+    "\t\t\t\t\t\tif (initialPreview.Title != null && initialPreview.Title.StartsWith(house, StringComparison.Ordinal))\n"
+    "\t\t\t\t\t\t\tcampaignFilter = house;\n"
+    "\t\t\t}\n\n"
+    "\t\t\tvoid RebuildList()\n\t\t\t{\n"
+    "\t\t\tvar allPreviews = new List<MapPreview>();\n\t\t\tmissionList.RemoveChildren();\n",
+)
+patch(
+    CB,
+    "\t\t\t\telse\n\t\t\t\t\tSelectMap(allPreviews[0]);\n",
+    "\t\t\t\telse\n\t\t\t\t\tSelectMap(allPreviews.FirstOrDefault(p => string.IsNullOrEmpty(campaignFilter)\n"
+    "\t\t\t\t\t\t|| (p.Title != null && p.Title.StartsWith(campaignFilter, StringComparison.Ordinal))) ?? allPreviews[0]);\n",
+)
+patch(
+    CB,
+    "\t\t\tvar startButton = widget.Get<ButtonWidget>(\"STARTGAME_BUTTON\");\n",
+    "\t\t\t}\n\n"
+    "\t\t\tRebuildList();\n\n"
+    "\t\t\tforeach (var (tabId, tabFilter, tabLabel) in new[]\n"
+    "\t\t\t{\n"
+    "\t\t\t\t(\"TAB_ATREIDES\", \"Atreides\", \"Атрейдіси\"),\n"
+    "\t\t\t\t(\"TAB_HARKONNEN\", \"Harkonnen\", \"Харконнени\"),\n"
+    "\t\t\t\t(\"TAB_ORDOS\", \"Ordos\", \"Ордоси\"),\n"
+    "\t\t\t\t(\"TAB_ALL\", \"\", \"Усі\")\n"
+    "\t\t\t})\n"
+    "\t\t\t{\n"
+    "\t\t\t\tvar tab = widget.GetOrNull<ButtonWidget>(tabId);\n"
+    "\t\t\t\tif (tab == null)\n"
+    "\t\t\t\t\tcontinue;\n\n"
+    "\t\t\t\ttab.GetText = () => tabLabel;\n"
+    "\t\t\t\ttab.IsHighlighted = () => campaignFilter == tabFilter;\n"
+    "\t\t\t\ttab.OnClick = () =>\n"
+    "\t\t\t\t{\n"
+    "\t\t\t\t\tcampaignFilter = tabFilter;\n"
+    "\t\t\t\t\tRebuildList();\n"
+    "\t\t\t\t};\n"
+    "\t\t\t}\n\n"
+    "\t\t\tvar startButton = widget.Get<ButtonWidget>(\"STARTGAME_BUTTON\");\n",
+)
+patch(
+    CB,
+    "\t\tvoid CreateMissionGroup(string title, IEnumerable<MapPreview> previews, Action onExit)\n\t\t{\n",
+    "\t\tvoid CreateMissionGroup(string title, IEnumerable<MapPreview> previews, Action onExit)\n\t\t{\n"
+    "\t\t\tif (!string.IsNullOrEmpty(campaignFilter) && !title.StartsWith(campaignFilter, StringComparison.Ordinal))\n"
+    "\t\t\t\treturn;\n\n",
+)
+
+patch(
+    CB,
+    "\t\t\t\tif (map != null && map.Visibility.HasFlag(MapVisibility.MissionSelector))\n",
+    "\t\t\t\tif (map != null && map.Visibility.HasFlag(MapVisibility.MissionSelector)\n"
+    "\t\t\t\t\t&& (string.IsNullOrEmpty(campaignFilter) || (map.Title != null && map.Title.StartsWith(campaignFilter, StringComparison.Ordinal))))\n",
+)
+
+CY = "mods/d2k/chrome/missionbrowser.yaml"
+patch(
+    CY,
+    "\t\tScrollPanel@MISSION_LIST:\n\t\t\tX: 20\n\t\t\tY: 50\n\t\t\tWidth: 190\n\t\t\tHeight: 483\n",
+    "".join(
+        f"\t\tButton@{i}:\n\t\t\tX: {20 + n * 162}\n\t\t\tY: 50\n\t\t\tWidth: 156\n\t\t\tHeight: 25\n\t\t\tFont: Bold\n"
+        for n, i in enumerate(["TAB_ATREIDES", "TAB_HARKONNEN", "TAB_ORDOS", "TAB_ALL"])
+    )
+    + "\t\tScrollPanel@MISSION_LIST:\n\t\t\tX: 20\n\t\t\tY: 82\n\t\t\tWidth: 190\n\t\t\tHeight: 451\n",
+)
+patch(
+    CY,
+    "\t\tContainer@MISSION_INFO:\n\t\t\tX: 220\n\t\t\tY: 50\n\t\t\tWidth: PARENT_WIDTH - 240\n\t\t\tHeight: 483\n",
+    "\t\tContainer@MISSION_INFO:\n\t\t\tX: 220\n\t\t\tY: 82\n\t\t\tWidth: PARENT_WIDTH - 240\n\t\t\tHeight: 451\n",
+)
+
 PY
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"
