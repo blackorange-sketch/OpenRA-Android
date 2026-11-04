@@ -29,4 +29,24 @@ patch(
     "var dir = AppDomain.CurrentDomain.BaseDirectory;",
     'var dir = Environment.GetEnvironmentVariable("OPENRA_BIN_DIR") ?? AppDomain.CurrentDomain.BaseDirectory;',
 )
+
+# 2. AssemblyLoader on Android: DependencyContext.Default is null there (the APK has no entry
+#    deps.json), so reading a mod's deps.json threw, the exception was swallowed and no
+#    managed dependency (SDL2-CS, ...) was ever registered.
+patch(
+    "OpenRA.Game/Support/AssemblyLoader.cs",
+    ": DependencyContext.Default.RuntimeGraph;",
+    ": (DependencyContext.Default?.RuntimeGraph ?? []);",
+)
+
+# 3. Independent of deps.json: fall back to a plain DLL next to the loaded assembly.
+patch(
+    "OpenRA.Game/Support/AssemblyLoader.cs",
+    "\t\t\t\treturn LoadFromAssemblyPath(path);\n\n\t\t\treturn null;\n",
+    "\t\t\t\treturn LoadFromAssemblyPath(path);\n\n"
+    "\t\t\tvar sideBySide = Path.Combine(basePath, assemblyName.Name + \".dll\");\n"
+    "\t\t\tif (File.Exists(sideBySide))\n"
+    "\t\t\t\treturn LoadFromAssemblyPath(sideBySide);\n\n"
+    "\t\t\treturn null;\n",
+)
 PY

@@ -42,6 +42,8 @@ for f in OpenRA.Mods.Common.dll OpenRA.Mods.Cnc.dll OpenRA.Mods.D2k.dll OpenRA.P
 	[ -f "$STAGE/bin/$f" ] || { echo "missing $f in payload" >&2; exit 1; }
 done
 
+echo "==> payload/bin:"; ls -1 "$STAGE/bin" | sed 's/^/    /'
+
 echo "==> Assemblies requested by the d2k mod manifest:"
 grep -A8 '^Assemblies:' "$OPENRA/mods/d2k/mod.yaml" || true
 
