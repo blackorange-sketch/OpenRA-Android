@@ -114,7 +114,7 @@ namespace OpenRA.Platforms.Default
 		float surfW = 1000, surfH = 500;
 
 		// ---- On-screen buttons: drawn by DrawOverlay, hit-tested here before anything reaches the widget tree ----
-		enum HudKind { Group, SelectAll, Base, Event, Pause, Add, Cancel }
+		enum HudKind { Group, SelectAll, Base, Event, Pause, Add, Attack, Cancel }
 
 		struct HudButton
 		{
@@ -129,6 +129,9 @@ namespace OpenRA.Platforms.Default
 		int hudIndex = -1;
 		bool hudFired;
 		int lastGroup = -1;
+		int placeBtn = -1; // 0 = confirm, 1 = cancel (the buttons next to the building ghost)
+		string toast;
+		uint toastUntil;
 		uint lastGroupTick;
 
 		void LayoutHud()
@@ -142,7 +145,7 @@ namespace OpenRA.Platforms.Default
 
 			const float GapF = 0.12f;
 			const float SplitF = 0.7f;
-			const int Actions = 6;
+			const int Actions = 7;
 			var total = GroupButtons + Actions;
 			var avail = res.Width * 0.74f; // stay clear of the sidebar on the right
 			var size = Math.Min(res.Height * 0.085f, avail / (total + (total - 2) * GapF + SplitF));
@@ -151,7 +154,7 @@ namespace OpenRA.Platforms.Default
 			var x = Math.Max(res.Height * 0.16f, (avail - width) / 2);
 			var y = res.Height * 0.012f;
 
-			var kinds = new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add, HudKind.Cancel };
+			var kinds = new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add, HudKind.Attack, HudKind.Cancel };
 			for (var i = 0; i < total; i++)
 			{
 				if (i == GroupButtons)
@@ -190,6 +193,74 @@ namespace OpenRA.Platforms.Default
 			return -1;
 		}
 
+		void Toast(string text, int ms = 2200)
+		{
+			toast = text;
+			toastUntil = SDL.SDL_GetTicks() + (uint)ms;
+		}
+
+		// ---- Confirm / cancel buttons that sit next to the building ghost ----
+		bool PlaceButtonsVisible =>
+			lastToPos != null && placePending && mode != Mode.PlaceDrag && Game.IsPlacingBuilding && Game.TouchHudActive;
+
+		void PlaceLayout(out int okX, out int noX, out int top, out int size)
+		{
+			var res = Game.Renderer.Resolution;
+			size = (int)(res.Height * 0.10f);
+			var gap = Math.Max(4, size / 6);
+			var g = lastToPos((int)placeX, (int)placeY);
+			var cx = Math.Min(Math.Max(g.X, size + gap), (int)(res.Width * 0.74f) - size - gap);
+			top = Math.Min(Math.Max((int)(res.Height * 0.12f), g.Y - (int)(res.Height * 0.22f)), res.Height - size - gap);
+			okX = cx + gap / 2;
+			noX = cx - gap / 2 - size;
+		}
+
+		int PlaceHit(int2 pos)
+		{
+			if (!PlaceButtonsVisible)
+				return -1;
+
+			PlaceLayout(out var okX, out var noX, out var top, out var size);
+			const int Pad = 8;
+			if (pos.Y >= top - Pad && pos.Y < top + size + Pad)
+			{
+				if (pos.X >= okX - Pad && pos.X < okX + size + Pad)
+					return 0;
+				if (pos.X >= noX - Pad && pos.X < noX + size + Pad)
+					return 1;
+			}
+
+			return -1;
+		}
+
+		// A right click on the battlefield leaves any input mode (placement, attack-move) without deselecting.
+		void RightCancel(IInputHandler h)
+		{
+			placePending = false;
+			if (lastToPos != null)
+				Click(h, MouseButton.Right, lastToPos((int)(surfW * 0.4f), (int)(surfH * 0.5f)), Modifiers.None);
+		}
+
+		void PlaceTap(IInputHandler h, int which)
+		{
+			Game.TouchHaptic?.Invoke(which == 0 ? 30 : 12);
+			Log("place button " + (which == 0 ? "confirm" : "cancel"));
+			if (which == 1)
+			{
+				RightCancel(h);
+				return;
+			}
+
+			if (lastToPos == null)
+				return;
+
+			var at = lastToPos((int)placeX, (int)placeY);
+			Send(h, MouseInputEvent.Move, MouseButton.None, at, int2.Zero, Modifiers.None);
+			Down(h, MouseButton.Left, at, Modifiers.None);
+			Up(h, MouseButton.Left, at, Modifiers.None);
+			placePending = false;
+		}
+
 		static void Key(IInputHandler h, Keycode key, Modifiers mods, int taps = 1)
 		{
 			try
@@ -213,6 +284,21 @@ namespace OpenRA.Platforms.Default
 			{
 				case HudKind.Group:
 				{
+					if (Game.ControlGroupSize(b.Index) == 0)
+					{
+						// Tapping an empty group saves the current selection into it.
+						if (Game.SelectedCount > 0)
+						{
+							Game.TouchHaptic?.Invoke(45);
+							Key(h, GroupKey(b.Index), Modifiers.Ctrl);
+							Toast($"Групу {b.Index + 1} збережено");
+						}
+						else
+							Toast($"Група {b.Index + 1} порожня: виділіть війська і торкніться її");
+
+						break;
+					}
+
 					var now = SDL.SDL_GetTicks();
 					var taps = lastGroup == b.Index && now - lastGroupTick < 350 ? 2 : 1;
 					lastGroup = b.Index;
@@ -228,14 +314,27 @@ namespace OpenRA.Platforms.Default
 				case HudKind.Base: Key(h, Keycode.H, Modifiers.None); break;
 				case HudKind.Event: Key(h, Keycode.SPACE, Modifiers.None); break;
 				case HudKind.Pause: Key(h, Keycode.PAUSE, Modifiers.None); break;
-				case HudKind.Add: AddMode = !AddMode; break;
+				case HudKind.Add:
+					AddMode = !AddMode;
+					if (AddMode)
+						Toast("Наступне виділення додається до поточного");
+
+					break;
+				case HudKind.Attack:
+					if (Game.IsAttackMoveArmed)
+						RightCancel(h);
+					else if (Game.SelectedCount == 0)
+						Toast("Спершу виділіть війська");
+					else
+					{
+						Key(h, Keycode.A, Modifiers.None);
+						Toast("Торкніться землі або цілі: атака-рух");
+					}
+
+					break;
 				case HudKind.Cancel:
 				{
-					// Right click on the battlefield cancels building placement.
-					placePending = false;
-					if (lastToPos != null)
-						Click(h, MouseButton.Right, lastToPos((int)(surfW * 0.4f), (int)(surfH * 0.5f)), Modifiers.None);
-
+					RightCancel(h);
 					break;
 				}
 			}
@@ -269,7 +368,8 @@ namespace OpenRA.Platforms.Default
 					continue;
 
 				var pressed = mode == Mode.Hud && hudIndex == i;
-				var active = (b.Kind == HudKind.Add && AddMode) || (b.Kind == HudKind.Pause && Game.IsWorldPaused);
+				var active = (b.Kind == HudKind.Add && AddMode) || (b.Kind == HudKind.Pause && Game.IsWorldPaused)
+					|| (b.Kind == HudKind.Attack && Game.IsAttackMoveArmed);
 				var count = b.Kind == HudKind.Group ? Game.ControlGroupSize(b.Index) : 0;
 
 				var fill = active ? Color.FromArgb(215, 190, 140, 25)
@@ -304,6 +404,7 @@ namespace OpenRA.Platforms.Default
 					case HudKind.SelectAll: Label(bold, "Всі", cx, cy, white); break;
 					case HudKind.Base: Label(bold, "База", cx, cy, white); break;
 					case HudKind.Event: Label(bold, "Подія", cx, cy, white); break;
+					case HudKind.Attack: Label(bold, "Атака", cx, cy, white); break;
 					case HudKind.Pause:
 					{
 						var bw = b.W * 0.14f;
@@ -331,6 +432,46 @@ namespace OpenRA.Platforms.Default
 						break;
 					}
 				}
+			}
+
+			if (PlaceButtonsVisible)
+			{
+				PlaceLayout(out var okX, out var noX, out var top, out var size);
+				var green = Color.FromArgb(255, 120, 235, 120);
+				var red = Color.FromArgb(255, 255, 110, 90);
+				for (var k = 0; k < 2; k++)
+				{
+					var x0 = k == 0 ? okX : noX;
+					var pressed = mode == Mode.Hud && placeBtn == k;
+					var tl = new Vector3(x0, top, 0);
+					var br = new Vector3(x0 + size, top + size, 0);
+					rc.FillRect(tl, br, pressed ? Color.FromArgb(225, 95, 95, 95) : Color.FromArgb(190, 12, 12, 12));
+					rc.DrawRect(tl, br, 2f, k == 0 ? green : red);
+
+					var cx = x0 + size / 2f;
+					var cy = top + size / 2f;
+					var arm = size * 0.26f;
+					if (k == 0)
+					{
+						rc.DrawLine(new Vector2(cx - arm, cy), new Vector2(cx - arm * 0.3f, cy + arm * 0.8f), 4, green);
+						rc.DrawLine(new Vector2(cx - arm * 0.3f, cy + arm * 0.8f), new Vector2(cx + arm, cy - arm * 0.8f), 4, green);
+					}
+					else
+					{
+						rc.DrawLine(new Vector2(cx - arm, cy - arm), new Vector2(cx + arm, cy + arm), 4, red);
+						rc.DrawLine(new Vector2(cx - arm, cy + arm), new Vector2(cx + arm, cy - arm), 4, red);
+					}
+				}
+			}
+
+			if (toast != null && now < toastUntil && hud.Count > 0)
+			{
+				var m = bold.Measure(toast);
+				var pad = 10f;
+				var tx = Game.Renderer.Resolution.Width * 0.37f - m.X / 2f;
+				var ty = hud[0].Y + hud[0].H + 12f;
+				rc.FillRect(new Vector3(tx - pad, ty - 4, 0), new Vector3(tx + m.X + pad, ty + m.Y + 4, 0), Color.FromArgb(185, 12, 12, 12));
+				bold.DrawTextWithShadow(toast, new Vector2(tx, ty), white, Color.Black, 1);
 			}
 		}
 
@@ -547,6 +688,15 @@ namespace OpenRA.Platforms.Default
 					{
 						lastX = x;
 						lastY = y;
+						placeBtn = PlaceHit(P(x, y));
+						if (placeBtn >= 0)
+						{
+							hudIndex = -1;
+							mode = Mode.Hud;
+							hudFired = true;
+							break;
+						}
+
 						hudIndex = HudHit(P(x, y));
 						if (hudIndex >= 0)
 						{
@@ -564,6 +714,7 @@ namespace OpenRA.Platforms.Default
 						{
 							// A second finger cancels a half-made button press.
 							hudIndex = -1;
+							placeBtn = -1;
 							mode = Mode.Ignore;
 							break;
 						}
@@ -602,6 +753,7 @@ namespace OpenRA.Platforms.Default
 						if (hx * hx + hy * hy > slop * slop * 4)
 						{
 							hudIndex = -1;
+							placeBtn = -1;
 							mode = Mode.Ignore;
 						}
 
@@ -744,10 +896,13 @@ namespace OpenRA.Platforms.Default
 
 					if (mode == Mode.Hud && fingers.Count == 1)
 					{
-						if (hudIndex >= 0 && hudIndex < hud.Count && !hudFired)
+						if (placeBtn >= 0)
+							PlaceTap(h, placeBtn);
+						else if (hudIndex >= 0 && hudIndex < hud.Count && !hudFired)
 							HudTap(h, hud[hudIndex]);
 
 						hudIndex = -1;
+						placeBtn = -1;
 					}
 					else if (mode == Mode.Pending && fingers.Count == 1)
 					{
@@ -845,6 +1000,7 @@ namespace OpenRA.Platforms.Default
 					if (fingers.Count == 0)
 					{
 						hudIndex = -1;
+						placeBtn = -1;
 						mode = Mode.Idle;
 						panning = false;
 						bits = MouseButton.None;
@@ -868,6 +1024,7 @@ namespace OpenRA.Platforms.Default
 				hudFired = true;
 				Game.TouchHaptic?.Invoke(45);
 				Key(h, GroupKey(hud[hudIndex].Index), Modifiers.Ctrl);
+				Toast($"Групу {hud[hudIndex].Index + 1} збережено");
 				Log($"hud group {hud[hudIndex].Index + 1} assigned");
 				return;
 			}
