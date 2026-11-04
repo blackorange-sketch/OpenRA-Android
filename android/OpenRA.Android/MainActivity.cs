@@ -315,14 +315,18 @@ namespace OpenRAHost
 			return s;
 		}
 
-		string ComputeUiScale()
+		/// <summary>
+		/// Menus need ~600 logical pixels of height; the in-game sidebar is ~490 tall, so a running game can use a
+		/// larger scale (bigger buttons and icons) than the menus.
+		/// </summary>
+		string ComputeUiScale(bool inGame)
 		{
-			// OpenRA (patched) needs at least 600 logical pixels of height, so the UI scale is the largest
-			// quarter-step that still satisfies that on this screen.
 			var m = new DisplayMetrics();
 			WindowManager.DefaultDisplay.GetRealMetrics(m);
 			var shortSide = Math.Min(m.WidthPixels, m.HeightPixels);
-			var scale = Math.Clamp(Math.Floor(shortSide / 600.0 * 4) / 4, 1.0, 3.0);
+			var scale = inGame
+				? Math.Clamp(Math.Floor(shortSide / 492.0 * 20) / 20, 1.0, 3.0)
+				: Math.Clamp(Math.Floor(shortSide / 600.0 * 4) / 4, 1.0, 3.0);
 			return scale.ToString("0.##", CultureInfo.InvariantCulture);
 		}
 
@@ -333,7 +337,7 @@ namespace OpenRAHost
 
 			// A crash file from an earlier run must not be reported as the result of this one.
 			DiagnosticsReport.Clear(FilesRoot);
-			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(), TouchDy);
+			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy);
 
 			var intent = new Intent();
 			intent.SetClassName(this, "org.openra.android.OpenRAActivity");

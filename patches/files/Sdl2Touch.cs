@@ -2,6 +2,7 @@
 //
 //   one finger tap         left click (snapped to the nearest button within reach of a fingertip)
 //   one finger drag        left button drag (selection box, sliders, ...)
+//   building placement     first tap / drag only moves the ghost; a second tap near it confirms
 //   long press (0.4 s)     right click
 //   second finger tap      right click at the second finger
 //   two finger drag        pan the battlefield (middle button drag)
@@ -22,7 +23,7 @@ namespace OpenRA.Platforms.Default
 			public uint StartTick;
 		}
 
-		enum Mode { Idle, Pending, Drag, LongPress, Multi, Ignore }
+		enum Mode { Idle, Pending, Drag, PlaceDrag, LongPress, Multi, Ignore }
 
 		// Vertical calibration in physical pixels (set in the launcher): positive moves the touch point up.
 		static readonly int TouchDy = int.TryParse(Environment.GetEnvironmentVariable("OPENRA_TOUCH_DY"), out var dy) ? dy : 0;
@@ -38,6 +39,17 @@ namespace OpenRA.Platforms.Default
 		bool panning;
 		float startCx, startCy, startDist, lastCx, lastCy, lastDist, zoomAccum;
 		float lastX, lastY;
+
+		// Two-step building placement: the ghost follows taps/drags, a second tap close to it confirms.
+		bool placePending;
+		float placeX, placeY;
+		const float PlaceLift = 0.09f; // ghost is drawn this fraction of the screen height above the finger while dragging
+
+		static bool OverWorld()
+		{
+			var n = Ui.MouseOverWidget?.GetType().Name;
+			return n == "WorldInteractionControllerWidget" || n == "ViewportControllerWidget";
+		}
 
 		static byte Sdl(MouseButton b) =>
 			b == MouseButton.Right ? (byte)SDL.SDL_BUTTON_RIGHT
@@ -205,12 +217,26 @@ namespace OpenRA.Platforms.Default
 						var dy = y - fi.StartY;
 						if (dx * dx + dy * dy > slop * slop)
 						{
-							mode = Mode.Drag;
-							Down(h, MouseButton.Left, P(fi.StartX, fi.StartY), mods);
+							if (Game.IsPlacingBuilding && OverWorld())
+								mode = Mode.PlaceDrag;
+							else
+							{
+								mode = Mode.Drag;
+								Down(h, MouseButton.Left, P(fi.StartX, fi.StartY), mods);
+							}
 						}
 					}
 
-					if (mode == Mode.Drag)
+					if (mode == Mode.PlaceDrag)
+					{
+						placeX = x;
+						placeY = Math.Max(0, y - height * PlaceLift);
+						Send(h, MouseInputEvent.Move, MouseButton.None, P(placeX, placeY), int2.Zero, mods);
+						placePending = true;
+						lastX = x;
+						lastY = y;
+					}
+					else if (mode == Mode.Drag)
 					{
 						var from = P(lastX, lastY);
 						var to = P(x, y);
@@ -269,8 +295,47 @@ namespace OpenRA.Platforms.Default
 					fi.Y = y;
 					var wasSecond = order.Count > 1 && order[1] == f.fingerId;
 
+					if (!Game.IsPlacingBuilding)
+						placePending = false;
+
 					if (mode == Mode.Pending && fingers.Count == 1)
-						Click(h, MouseButton.Left, P(fi.StartX, fi.StartY), mods);
+					{
+						var placingOnWorld = false;
+						if (Game.IsPlacingBuilding)
+						{
+							Send(h, MouseInputEvent.Move, MouseButton.None, P(fi.StartX, fi.StartY), int2.Zero, mods);
+							placingOnWorld = OverWorld();
+						}
+
+						if (placingOnWorld)
+						{
+							var near = height * 0.12f;
+							var ddx = fi.StartX - placeX;
+							var ddy = fi.StartY - placeY;
+							if (placePending && ddx * ddx + ddy * ddy < near * near)
+							{
+								// Second tap near the ghost: build it where the ghost is.
+								var at = P(placeX, placeY);
+								Send(h, MouseInputEvent.Move, MouseButton.None, at, int2.Zero, mods);
+								Down(h, MouseButton.Left, at, mods);
+								Up(h, MouseButton.Left, at, mods);
+								placePending = false;
+							}
+							else
+							{
+								// First tap: only show where it would be built.
+								placeX = fi.StartX;
+								placeY = fi.StartY;
+								placePending = true;
+							}
+						}
+						else
+							Click(h, MouseButton.Left, P(fi.StartX, fi.StartY), mods);
+					}
+					else if (mode == Mode.PlaceDrag && fingers.Count == 1)
+					{
+						// Leave the ghost where it is; tap near it to confirm.
+					}
 					else if (mode == Mode.Drag && fingers.Count == 1)
 						Up(h, MouseButton.Left, P(x, y), mods);
 					else if (mode == Mode.Multi)

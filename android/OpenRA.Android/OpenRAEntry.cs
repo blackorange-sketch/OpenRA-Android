@@ -22,6 +22,7 @@ namespace OpenRAHost
 		static string engineDir;
 		static string supportDir;
 		static string uiScale = "1";
+		static string gameScale = "1";
 		static int touchDy;
 
 		[DllImport("openramain")]
@@ -33,9 +34,10 @@ namespace OpenRAHost
 		[DllImport("SDL2")]
 		static extern int SDL_SetHint([MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
 
-		public static void Configure(string engineRoot, string filesRoot, string scale, int touchOffset)
+		public static void Configure(string engineRoot, string filesRoot, string scale, string inGameScale, int touchOffset)
 		{
 			uiScale = scale;
+			gameScale = inGameScale;
 			touchDy = touchOffset;
 			engineDir = engineRoot;
 			supportDir = Path.Combine(filesRoot, "support");
@@ -49,6 +51,8 @@ namespace OpenRAHost
 			{
 				Environment.SetEnvironmentVariable("OPENRA_BIN_DIR", Path.Combine(engineDir, "bin"));
 				SDL_SetMainReady();
+				Environment.SetEnvironmentVariable("OPENRA_UI_SCALE_MENU", uiScale);
+				Environment.SetEnvironmentVariable("OPENRA_UI_SCALE_GAME", gameScale);
 				Environment.SetEnvironmentVariable("OPENRA_TOUCH_DY", touchDy.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
 				// SDL otherwise rotates the activity to match the (portrait) desktop size when it creates

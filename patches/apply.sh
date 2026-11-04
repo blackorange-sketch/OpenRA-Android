@@ -87,6 +87,20 @@ patch(
     "new(1024, 720);",
     "new(1024, 600);",
 )
+
+# 7. Touch UI: a larger UI scale while a game is running (menus keep their own scale), and a flag the
+#    touch layer uses to turn building placement into a two-step "preview, then confirm" interaction.
+patch(
+    "OpenRA.Game/Game.cs",
+    "\t\tinternal static void StartGame(Map map, WorldType type)\n\t\t{\n",
+    "\t\tpublic static bool IsPlacingBuilding =>\n"
+    "\t\t\tworldRenderer?.World?.OrderGenerator?.GetType().Name == \"PlaceBuildingOrderGenerator\";\n\n"
+    "\t\tinternal static void StartGame(Map map, WorldType type)\n\t\t{\n"
+    "\t\t\t// Android host: separate UI scales for menus and for a running game.\n"
+    "\t\t\tvar hostScale = Environment.GetEnvironmentVariable(type == WorldType.Regular ? \"OPENRA_UI_SCALE_GAME\" : \"OPENRA_UI_SCALE_MENU\");\n"
+    "\t\t\tif (float.TryParse(hostScale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var hostScaleValue))\n"
+    "\t\t\t\tRenderer.SetUIScale(hostScaleValue);\n\n",
+)
 PY
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"
