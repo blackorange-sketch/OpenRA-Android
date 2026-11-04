@@ -97,6 +97,9 @@ namespace OpenRA.Mods.Common
 			return uid;
 		}
 
+		/// <summary>True when the last result queued a follow-up mission (without consuming it).</summary>
+		public static bool HasNext => pendingUid != null;
+
 		/// <summary>True once after a mission was queued: the browser then starts its briefing video by itself.</summary>
 		public static bool TakeAutoBriefing()
 		{

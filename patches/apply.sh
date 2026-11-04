@@ -276,6 +276,23 @@ patch(
     "\t\t\t\tlabel.GetColor = () => CampaignProgress.IsDone(preview.Title) ? OpenRA.Primitives.Color.FromArgb(255, 120, 230, 120) : normalColor;\n",
 )
 
+# After a win the game leaves to the menu by itself (the next mission is opened there).
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Ingame/LoadIngamePlayerOrObserverUILogic.cs",
+    "\t\t\t\t\t\tif (!string.IsNullOrEmpty(video))\n\t\t\t\t\t\t\tMedia.PlayFMVFullscreen(world, video, () => { });\n",
+    "\t\t\t\t\t\tvoid Advance()\n"
+    "\t\t\t\t\t\t{\n"
+    "\t\t\t\t\t\t\tif (won && CampaignProgress.HasNext)\n"
+    "\t\t\t\t\t\t\t\tGame.RunAfterDelay(5000, () =>\n"
+    "\t\t\t\t\t\t\t\t{\n"
+    "\t\t\t\t\t\t\t\t\tif (Game.IsCurrentWorld(world))\n"
+    "\t\t\t\t\t\t\t\t\t\tIngameMenuLogic.OnQuit(world);\n"
+    "\t\t\t\t\t\t\t\t});\n"
+    "\t\t\t\t\t\t}\n\n"
+    "\t\t\t\t\t\tif (!string.IsNullOrEmpty(video))\n\t\t\t\t\t\t\tMedia.PlayFMVFullscreen(world, video, Advance);\n"
+    "\t\t\t\t\t\telse\n\t\t\t\t\t\t\tAdvance();\n",
+)
+
 CY = "mods/d2k/chrome/missionbrowser.yaml"
 patch(
     CY,

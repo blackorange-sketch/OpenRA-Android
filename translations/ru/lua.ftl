@@ -2,7 +2,7 @@ objective-failed = Задача провалена
 objective-completed = Задача выполнена
 
 primary = Основная
-secondary = Дополнительная
+secondary = Дополн.
 
 new-primary-objective = Новая основная задача
 new-secondary-objective = Новая дополнительная задача

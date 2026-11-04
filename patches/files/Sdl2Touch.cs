@@ -111,9 +111,10 @@ namespace OpenRA.Platforms.Default
 		internal static bool AddMode;
 
 		MouseButton panBtn = MouseButton.Middle;
+		float surfW = 1000, surfH = 500;
 
 		// ---- On-screen buttons: drawn by DrawOverlay, hit-tested here before anything reaches the widget tree ----
-		enum HudKind { Group, SelectAll, Base, Event, Pause, Add }
+		enum HudKind { Group, SelectAll, Base, Event, Pause, Add, Cancel }
 
 		struct HudButton
 		{
@@ -141,7 +142,7 @@ namespace OpenRA.Platforms.Default
 
 			const float GapF = 0.12f;
 			const float SplitF = 0.7f;
-			const int Actions = 5;
+			const int Actions = 6;
 			var total = GroupButtons + Actions;
 			var avail = res.Width * 0.74f; // stay clear of the sidebar on the right
 			var size = Math.Min(res.Height * 0.085f, avail / (total + (total - 2) * GapF + SplitF));
@@ -150,7 +151,7 @@ namespace OpenRA.Platforms.Default
 			var x = Math.Max(res.Height * 0.16f, (avail - width) / 2);
 			var y = res.Height * 0.012f;
 
-			var kinds = new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add };
+			var kinds = new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add, HudKind.Cancel };
 			for (var i = 0; i < total; i++)
 			{
 				if (i == GroupButtons)
@@ -179,6 +180,9 @@ namespace OpenRA.Platforms.Default
 			for (var i = 0; i < hud.Count; i++)
 			{
 				var b = hud[i];
+				if (b.Kind == HudKind.Cancel && !Game.IsPlacingBuilding)
+					continue;
+
 				if (pos.X >= b.X - Pad && pos.X < b.X + b.W + Pad && pos.Y >= b.Y - Pad && pos.Y < b.Y + b.H + Pad)
 					return i;
 			}
@@ -225,6 +229,15 @@ namespace OpenRA.Platforms.Default
 				case HudKind.Event: Key(h, Keycode.SPACE, Modifiers.None); break;
 				case HudKind.Pause: Key(h, Keycode.PAUSE, Modifiers.None); break;
 				case HudKind.Add: AddMode = !AddMode; break;
+				case HudKind.Cancel:
+				{
+					// Right click on the battlefield cancels building placement.
+					placePending = false;
+					if (lastToPos != null)
+						Click(h, MouseButton.Right, lastToPos((int)(surfW * 0.4f), (int)(surfH * 0.5f)), Modifiers.None);
+
+					break;
+				}
 			}
 		}
 
@@ -252,6 +265,9 @@ namespace OpenRA.Platforms.Default
 			for (var i = 0; i < hud.Count; i++)
 			{
 				var b = hud[i];
+				if (b.Kind == HudKind.Cancel && !Game.IsPlacingBuilding)
+					continue;
+
 				var pressed = mode == Mode.Hud && hudIndex == i;
 				var active = (b.Kind == HudKind.Add && AddMode) || (b.Kind == HudKind.Pause && Game.IsWorldPaused);
 				var count = b.Kind == HudKind.Group ? Game.ControlGroupSize(b.Index) : 0;
@@ -294,6 +310,15 @@ namespace OpenRA.Platforms.Default
 						var bh = b.H * 0.42f;
 						rc.FillRect(new Vector3(cx - bw * 1.6f, cy - bh / 2, 0), new Vector3(cx - bw * 0.6f, cy + bh / 2, 0), white);
 						rc.FillRect(new Vector3(cx + bw * 0.6f, cy - bh / 2, 0), new Vector3(cx + bw * 1.6f, cy + bh / 2, 0), white);
+						break;
+					}
+
+					case HudKind.Cancel:
+					{
+						var arm = b.W * 0.26f;
+						var red = Color.FromArgb(255, 255, 110, 90);
+						rc.DrawLine(new Vector2(cx - arm, cy - arm), new Vector2(cx + arm, cy + arm), 3, red);
+						rc.DrawLine(new Vector2(cx - arm, cy + arm), new Vector2(cx + arm, cy - arm), 3, red);
 						break;
 					}
 
@@ -353,6 +378,12 @@ namespace OpenRA.Platforms.Default
 					return true;
 
 			return false;
+		}
+
+		static bool OverPalette()
+		{
+			var n = Ui.MouseOverWidget?.GetType().Name;
+			return n == "ProductionPaletteWidget" || n == "SupportPowersWidget";
 		}
 
 		static bool OverMinimap() => Ui.MouseOverWidget?.GetType().Name == "RadarWidget";
@@ -499,6 +530,8 @@ namespace OpenRA.Platforms.Default
 			int2 P(float px, float py) => toPos((int)px, (int)py);
 
 			lastToPos = toPos;
+			surfW = w;
+			surfH = height;
 			if (!geometryLogged)
 				LogGeometry(device);
 
@@ -781,7 +814,16 @@ namespace OpenRA.Platforms.Default
 					{
 					}
 					else if (mode == Mode.LongPress && fingers.Count == 1)
-						Click(h, OverMinimap() ? MouseButton.Left : MouseButton.Right, P(fi.StartX, fi.StartY), mods);
+					{
+						if (OverPalette())
+						{
+							// Sidebar icon: hold shows its description; the cursor stays there so the tooltip stays up.
+							Send(h, MouseInputEvent.Move, MouseButton.None, P(fi.StartX, fi.StartY), int2.Zero, mods);
+							Log("tooltip hold over " + WidgetInfo());
+						}
+						else
+							Click(h, OverMinimap() ? MouseButton.Left : MouseButton.Right, P(fi.StartX, fi.StartY), mods);
+					}
 					else if (mode == Mode.PlaceDrag && fingers.Count == 1)
 					{
 						// Leave the ghost where it is; tap near it to confirm.

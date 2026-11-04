@@ -35,3 +35,14 @@ dialog-surrender =
     .prompt = Вы уверены, что хотите сдаться?
     .confirm = Сдаться
     .cancel = Остаться
+
+menu-game-info =
+    .objectives = Задачи
+    .briefing = Брифинг
+    .options = Настройки
+    .debug = Читы
+    .chat = Чат
+
+label-mission-in-progress = В процессе
+label-mission-accomplished = Выполнено
+label-mission-failed = Провалено
