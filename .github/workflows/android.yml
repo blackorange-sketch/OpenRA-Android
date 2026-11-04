@@ -63,17 +63,7 @@ jobs:
           fi
 
       - name: Build APK
-        run: |
-          dotnet publish android/OpenRA.Android/OpenRA.Android.csproj -c Release \
-            -p:InstallAndroidDependencies=true -p:AcceptAndroidSDKLicenses=True \
-            -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$KEYSTORE" \
-            -p:AndroidSigningStorePass=openra-dev -p:AndroidSigningKeyAlias=openra -p:AndroidSigningKeyPass=openra-dev \
-            2>&1 | tee apk-build.log
-          APK="$(find android/OpenRA.Android/bin -name '*-Signed.apk' | head -n 1)"
-          echo "APK=$APK"
-          [ -n "$APK" ] || { echo "No signed APK produced" >&2; exit 1; }
-          mkdir -p dist && cp "$APK" dist/OpenRA-Android.apk
-          unzip -l dist/OpenRA-Android.apk | grep -E 'lib/|assets/|classes' || true
+        run: bash scripts/build-apk.sh
 
       - uses: actions/upload-artifact@v4
         with:

@@ -33,7 +33,20 @@
 		<AndroidNativeLibrary Include="lib\arm64-v8a\*.so">
 			<Abi>arm64-v8a</Abi>
 		</AndroidNativeLibrary>
-		<!-- Built by scripts/build-java.sh: SDLActivity + OpenRAActivity, packaged and dexed, not bound -->
-		<AndroidLibrary Include="libs\openra-java.jar" Bind="false" />
+	</ItemGroup>
+
+	<!-- Java glue (SDLActivity + OpenRAActivity) built by scripts/build-java.sh. It lives outside the
+	     project directory on purpose: files inside are globbed automatically and bound to C#.
+	     JavaMode=jar (default) packages the prebuilt jar; JavaMode=source lets .NET compile the sources.
+	     scripts/build-apk.sh tries both. -->
+	<PropertyGroup>
+		<JavaMode Condition="'$(JavaMode)' == ''">jar</JavaMode>
+		<JavaGlueDir>$(MSBuildThisFileDirectory)..\..\native-build\</JavaGlueDir>
+	</PropertyGroup>
+	<ItemGroup Condition="'$(JavaMode)' == 'jar'">
+		<AndroidLibrary Include="$(JavaGlueDir)openra-java.jar" Bind="false" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(JavaMode)' == 'source'">
+		<AndroidJavaSource Include="$(JavaGlueDir)java-all\**\*.java" Bind="false" />
 	</ItemGroup>
 </Project>
