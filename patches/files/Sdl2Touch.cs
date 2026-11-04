@@ -1,12 +1,12 @@
 // Touch gestures for OpenRA on Android. Added by the OpenRA-Android port (not part of upstream).
 //
-//   one finger tap         left click (snapped to the nearest button within reach of a fingertip)
-//   one finger drag        left button drag (selection box, sliders, ...)
+//   one finger tap         left click (snapped to the nearest button within reach of a fingertip);
+//                          with the Classic control scheme this both selects and orders
+//   one finger drag        battlefield: pan the camera; lists: scroll; other UI: left drag (sliders, ...)
+//   long press, then drag  selection box;  long press and release: right click (deselect / cancel)
 //   building placement     first tap / drag only moves the ghost; a second tap near it confirms
-//   long press (0.4 s)     right click
 //   second finger tap      right click at the second finger
-//   two finger drag        pan the battlefield (middle button drag)
-//   pinch                  zoom (mouse wheel)
+//   two finger drag        pan the battlefield, pinch zooms
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -24,7 +24,7 @@ namespace OpenRA.Platforms.Default
 			public uint StartTick;
 		}
 
-		enum Mode { Idle, Pending, Drag, PlaceDrag, LongPress, Multi, Ignore }
+		enum Mode { Idle, Pending, Drag, PlaceDrag, PanDrag, ScrollDrag, LongPress, Multi, Ignore }
 
 		// Vertical calibration in physical pixels (set in the launcher): positive moves the touch point up.
 		static readonly int TouchDy = int.TryParse(Environment.GetEnvironmentVariable("OPENRA_TOUCH_DY"), out var dy) ? dy : 0;
@@ -96,6 +96,18 @@ namespace OpenRA.Platforms.Default
 		bool placePending;
 		float placeX, placeY;
 		const float PlaceLift = 0.09f; // ghost is drawn this fraction of the screen height above the finger while dragging
+
+		float scrollAccum, lastTapX, lastTapY;
+		uint lastTapTick;
+
+		static bool InScrollPanel()
+		{
+			for (var w = Ui.MouseOverWidget; w != null; w = w.Parent)
+				if (w.GetType().Name == "ScrollPanelWidget")
+					return true;
+
+			return false;
+		}
 
 		static bool OverWorld()
 		{
@@ -255,6 +267,8 @@ namespace OpenRA.Platforms.Default
 					{
 						if (mode == Mode.Drag)
 							Up(h, MouseButton.Left, P(lastX, lastY), mods);
+						else if (mode == Mode.PanDrag)
+							Up(h, MouseButton.Middle, P(lastX, lastY), mods);
 
 						mode = Mode.Multi;
 						panning = false;
@@ -278,18 +292,37 @@ namespace OpenRA.Platforms.Default
 					fi.X = x;
 					fi.Y = y;
 
-					if (mode == Mode.Pending)
+					if (mode == Mode.Pending || mode == Mode.LongPress)
 					{
 						var dx = x - fi.StartX;
 						var dy = y - fi.StartY;
 						if (dx * dx + dy * dy > slop * slop)
 						{
-							if (Game.IsPlacingBuilding && OverWorld())
+							var armed = mode == Mode.LongPress;
+							var start = P(fi.StartX, fi.StartY);
+							if (armed)
+							{
+								// Long press then drag: selection box.
+								mode = Mode.Drag;
+								Down(h, MouseButton.Left, start, mods);
+							}
+							else if (Game.IsPlacingBuilding && OverWorld())
 								mode = Mode.PlaceDrag;
+							else if (InScrollPanel())
+							{
+								mode = Mode.ScrollDrag;
+								scrollAccum = 0;
+							}
+							else if (OverWorld())
+							{
+								// Drag on the battlefield moves the camera (scroll button + "Standard" scroll type).
+								mode = Mode.PanDrag;
+								Down(h, MouseButton.Middle, start, mods);
+							}
 							else
 							{
 								mode = Mode.Drag;
-								Down(h, MouseButton.Left, P(fi.StartX, fi.StartY), mods);
+								Down(h, MouseButton.Left, start, mods);
 							}
 						}
 					}
@@ -302,6 +335,26 @@ namespace OpenRA.Platforms.Default
 						placePending = true;
 						lastX = x;
 						lastY = y;
+					}
+					else if (mode == Mode.PanDrag)
+					{
+						var from = P(lastX, lastY);
+						var to = P(x, y);
+						Send(h, MouseInputEvent.Move, bits, to, to - from, mods);
+						lastX = x;
+						lastY = y;
+					}
+					else if (mode == Mode.ScrollDrag)
+					{
+						scrollAccum += y - lastY;
+						lastY = y;
+						var stepPx = height * 0.045f;
+						while (Math.Abs(scrollAccum) >= stepPx)
+						{
+							var dir = scrollAccum > 0 ? 1 : -1;
+							Send(h, MouseInputEvent.Scroll, MouseButton.None, P(x, y), new int2(0, dir), mods);
+							scrollAccum -= dir * stepPx;
+						}
 					}
 					else if (mode == Mode.Drag)
 					{
@@ -398,8 +451,33 @@ namespace OpenRA.Platforms.Default
 							}
 						}
 						else
-							Click(h, MouseButton.Left, P(fi.StartX, fi.StartY), mods);
+						{
+							// A quick second tap lands exactly where the first did, so double-tap (select all of a
+							// kind) works despite finger jitter.
+							var tx = fi.StartX;
+							var ty = fi.StartY;
+							var now = SDL.SDL_GetTicks();
+							var jx = tx - lastTapX;
+							var jy = ty - lastTapY;
+							if (now - lastTapTick < 350 && jx * jx + jy * jy < (height * 0.06f) * (height * 0.06f))
+							{
+								tx = lastTapX;
+								ty = lastTapY;
+							}
+
+							lastTapX = tx;
+							lastTapY = ty;
+							lastTapTick = now;
+							Click(h, MouseButton.Left, P(tx, ty), mods);
+						}
 					}
+					else if (mode == Mode.PanDrag && fingers.Count == 1)
+						Up(h, MouseButton.Middle, P(x, y), mods);
+					else if (mode == Mode.ScrollDrag)
+					{
+					}
+					else if (mode == Mode.LongPress && fingers.Count == 1)
+						Click(h, MouseButton.Right, P(fi.StartX, fi.StartY), mods);
 					else if (mode == Mode.PlaceDrag && fingers.Count == 1)
 					{
 						// Leave the ghost where it is; tap near it to confirm.
@@ -440,8 +518,9 @@ namespace OpenRA.Platforms.Default
 			if (SDL.SDL_GetTicks() - fi.StartTick < LongPressMs)
 				return;
 
+			// Armed: releasing without moving is a right click, dragging draws a selection box.
 			mode = Mode.LongPress;
-			Click(h, MouseButton.Right, toPos((int)fi.StartX, (int)fi.StartY), mods);
+			Log("long press armed");
 		}
 	}
 }

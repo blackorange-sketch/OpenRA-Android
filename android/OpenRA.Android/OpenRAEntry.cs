@@ -73,7 +73,10 @@ namespace OpenRAHost
 					"Engine.SupportDir=" + supportDir,
 					"Game.Mod=d2k",
 					"Graphics.UIScale=" + uiScale,
-					"Game.MouseScroll=Inverted"
+					"Game.MouseScroll=Standard",
+					"Game.MouseControlStyle=Classic",
+					"Game.UseAlternateScrollButton=True",
+					"Game.ViewportEdgeScroll=False"
 				};
 
 				Log.Info(Tag, "Starting OpenRA with " + string.Join(" ", args));
