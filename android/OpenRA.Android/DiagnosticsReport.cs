@@ -38,7 +38,7 @@ namespace OpenRAHost
 			var sb = new StringBuilder();
 			sb.AppendLine(head);
 
-			foreach (var name in new[] { "touch.log", "graphics.log", "exception.log", "debug.log" })
+			foreach (var name in new[] { "window.log", "touch.log", "graphics.log", "exception.log", "debug.log" })
 			{
 				var path = Path.Combine(filesRoot, "support", "Logs", name);
 				if (!File.Exists(path))

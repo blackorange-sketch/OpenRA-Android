@@ -54,7 +54,7 @@ namespace OpenRAHost
 				var logDir = Path.Combine(supportDir, "Logs");
 				Directory.CreateDirectory(logDir);
 				var touchLog = Path.Combine(logDir, "touch.log");
-				try { File.Delete(touchLog); } catch { }
+				try { File.Delete(touchLog); File.Delete(Path.Combine(logDir, "window.log")); } catch { }
 				Environment.SetEnvironmentVariable("OPENRA_TOUCH_LOG", touchLog);
 				Environment.SetEnvironmentVariable("OPENRA_UI_SCALE_MENU", uiScale);
 				Environment.SetEnvironmentVariable("OPENRA_UI_SCALE_GAME", gameScale);
