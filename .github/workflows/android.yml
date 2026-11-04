@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
 defaults:
   run:
     shell: bash
@@ -29,6 +33,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('OPENRA_REF', 'android/**/*.csproj') }}
+
       - name: Tools
         run: |
           sudo apt-get update -qq
@@ -37,7 +47,17 @@ jobs:
           dotnet --info | head -n 12
           cmake --version | head -n 1
 
+      - name: Cache native libraries
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            android/OpenRA.Android/lib
+            native-build/sdl-java
+          key: native-${{ hashFiles('scripts/build-native.sh', 'native/src/**') }}
+
       - name: Build native libraries (SDL2, OpenAL, FreeType, Lua)
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: bash scripts/build-native.sh 2>&1 | tee native-build.log
 
       - name: Build Java glue (SDLActivity)
