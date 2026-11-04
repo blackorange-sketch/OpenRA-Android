@@ -80,6 +80,13 @@ patch(
     "\n\t\t\ttouch.Tick(device, inputHandler, mods, (px, py) => EventPosition(device, px, py));\n"
     "\n\t\t\tif (pendingMotion != null)\n\t\t\t\tinputHandler.OnMouseInput(pendingMotion.Value);\n\t\t}\n",
 )
+
+# 6. Phones are short: allow a lower minimum effective height so the UI can be scaled up more.
+patch(
+    "OpenRA.Game/WorldViewportSizes.cs",
+    "new(1024, 720);",
+    "new(1024, 600);",
+)
 PY
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"

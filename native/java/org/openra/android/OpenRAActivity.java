@@ -20,7 +20,16 @@ public class OpenRAActivity extends SDLActivity {
 			getWindow().setAttributes(lp);
 		}
 
+		// 6 = SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+		setRequestedOrientation(6);
 		super.onCreate(savedInstanceState);
+	}
+
+	@Override
+	public void setRequestedOrientation(int requestedOrientation) {
+		// SDL picks portrait/landscape from the window size at creation time, which on a phone whose
+		// desktop is portrait flips the game upright. This game is landscape only.
+		super.setRequestedOrientation(6);
 	}
 
 	@Override
