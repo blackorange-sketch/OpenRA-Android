@@ -56,4 +56,30 @@ patch(
     "GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;",
     "try { GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce; } catch (PlatformNotSupportedException) { }",
 )
+
+# 5. Touch gestures: SDL's touch->mouse emulation is disabled by the host; Sdl2Touch turns raw finger
+#    events into the mouse input OpenRA expects.
+patch(
+    "OpenRA.Platforms.Default/Sdl2Input.cs",
+    "\t\tMouseButton lastButtonBits = MouseButton.None;\n",
+    "\t\tMouseButton lastButtonBits = MouseButton.None;\n\t\treadonly Sdl2Touch touch = new();\n",
+)
+patch(
+    "OpenRA.Platforms.Default/Sdl2Input.cs",
+    "\t\t\t\t\tcase SDL.SDL_EventType.SDL_TEXTINPUT:\n",
+    "\t\t\t\t\tcase SDL.SDL_EventType.SDL_FINGERDOWN:\n"
+    "\t\t\t\t\tcase SDL.SDL_EventType.SDL_FINGERMOTION:\n"
+    "\t\t\t\t\tcase SDL.SDL_EventType.SDL_FINGERUP:\n"
+    "\t\t\t\t\t\ttouch.Handle(e, device, inputHandler, mods, (px, py) => EventPosition(device, px, py));\n"
+    "\t\t\t\t\t\tbreak;\n\n"
+    "\t\t\t\t\tcase SDL.SDL_EventType.SDL_TEXTINPUT:\n",
+)
+patch(
+    "OpenRA.Platforms.Default/Sdl2Input.cs",
+    "\n\t\t\tif (pendingMotion != null)\n\t\t\t\tinputHandler.OnMouseInput(pendingMotion.Value);\n\t\t}\n",
+    "\n\t\t\ttouch.Tick(device, inputHandler, mods, (px, py) => EventPosition(device, px, py));\n"
+    "\n\t\t\tif (pendingMotion != null)\n\t\t\t\tinputHandler.OnMouseInput(pendingMotion.Value);\n\t\t}\n",
+)
 PY
+
+cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"

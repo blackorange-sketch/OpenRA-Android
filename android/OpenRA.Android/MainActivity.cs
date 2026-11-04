@@ -289,9 +289,12 @@ namespace OpenRAHost
 
 		string ComputeUiScale()
 		{
-			var m = Resources.DisplayMetrics;
+			// OpenRA needs at least ~720 logical pixels of height, so the UI scale is the largest
+			// quarter-step that still satisfies that on this screen.
+			var m = new DisplayMetrics();
+			WindowManager.DefaultDisplay.GetRealMetrics(m);
 			var shortSide = Math.Min(m.WidthPixels, m.HeightPixels);
-			var scale = Math.Clamp(Math.Round(shortSide / 540.0 * 4) / 4, 1.0, 3.0);
+			var scale = Math.Clamp(Math.Floor(shortSide / 720.0 * 4) / 4, 1.0, 3.0);
 			return scale.ToString("0.##", CultureInfo.InvariantCulture);
 		}
 

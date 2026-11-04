@@ -52,12 +52,16 @@ namespace OpenRAHost
 				// the window, which produced a cropped, mis-sized game view. Keep it landscape.
 				SDL_SetHint("SDL_IOS_ORIENTATIONS", "LandscapeLeft LandscapeRight");
 
+				// Raw finger events are turned into mouse input by Sdl2Touch (patched into OpenRA).
+				SDL_SetHint("SDL_TOUCH_MOUSE_EVENTS", "0");
+
 				var args = new[]
 				{
 					"Engine.EngineDir=" + engineDir,
 					"Engine.SupportDir=" + supportDir,
 					"Game.Mod=d2k",
-					"Graphics.UIScale=" + uiScale
+					"Graphics.UIScale=" + uiScale,
+					"Game.MouseScroll=Inverted"
 				};
 
 				Log.Info(Tag, "Starting OpenRA with " + string.Join(" ", args));
