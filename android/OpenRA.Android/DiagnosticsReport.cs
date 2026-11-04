@@ -22,10 +22,21 @@ namespace OpenRAHost
 			if (!File.Exists(crashFile))
 				return null;
 
+			return Compose(filesRoot, "OpenRA stopped with an error on the previous run.\n\n" + ReadSafe(crashFile));
+		}
+
+		/// <summary>Logs of the last run, whether or not it crashed.</summary>
+		public static string BuildAlways(string filesRoot)
+		{
+			var crashFile = CrashFile(filesRoot);
+			var head = File.Exists(crashFile) ? "Last run crashed:\n\n" + ReadSafe(crashFile) : "No crash recorded.";
+			return Compose(filesRoot, head);
+		}
+
+		static string Compose(string filesRoot, string head)
+		{
 			var sb = new StringBuilder();
-			sb.AppendLine("OpenRA stopped with an error on the previous run.");
-			sb.AppendLine();
-			sb.AppendLine(ReadSafe(crashFile));
+			sb.AppendLine(head);
 
 			foreach (var name in new[] { "graphics.log", "exception.log", "debug.log" })
 			{

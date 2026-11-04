@@ -21,6 +21,7 @@ namespace OpenRAHost
 
 		static string engineDir;
 		static string supportDir;
+		static string uiScale = "1";
 
 		[DllImport("openramain")]
 		static extern void OpenRA_SetMain(IntPtr fn);
@@ -28,8 +29,9 @@ namespace OpenRAHost
 		[DllImport("SDL2")]
 		static extern void SDL_SetMainReady();
 
-		public static void Configure(string engineRoot, string filesRoot)
+		public static void Configure(string engineRoot, string filesRoot, string scale)
 		{
+			uiScale = scale;
 			engineDir = engineRoot;
 			supportDir = Path.Combine(filesRoot, "support");
 			Directory.CreateDirectory(supportDir);
@@ -47,7 +49,8 @@ namespace OpenRAHost
 				{
 					"Engine.EngineDir=" + engineDir,
 					"Engine.SupportDir=" + supportDir,
-					"Game.Mod=d2k"
+					"Game.Mod=d2k",
+					"Graphics.UIScale=" + uiScale
 				};
 
 				Log.Info(Tag, "Starting OpenRA with " + string.Join(" ", args));
