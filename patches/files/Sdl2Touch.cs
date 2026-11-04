@@ -1,6 +1,6 @@
 // Touch gestures for OpenRA on Android. Added by the OpenRA-Android port (not part of upstream).
 //
-//   one finger tap         left click
+//   one finger tap         left click (snapped to the nearest button within reach of a fingertip)
 //   one finger drag        left button drag (selection box, sliders, ...)
 //   long press (0.4 s)     right click
 //   second finger tap      right click at the second finger
@@ -8,6 +8,8 @@
 //   pinch                  zoom (mouse wheel)
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using OpenRA.Widgets;
 using SDL2;
 
 namespace OpenRA.Platforms.Default
@@ -56,8 +58,77 @@ namespace OpenRA.Platforms.Default
 			Send(h, MouseInputEvent.Up, b, pos, int2.Zero, mods, MultiTapDetection.InfoFromMouse(Sdl(b)));
 		}
 
+		const int SnapRadius = 26;
+
+		static bool IsTarget(Widget w)
+		{
+			var n = w.GetType().Name;
+			return n.EndsWith("ButtonWidget", StringComparison.Ordinal) || n.EndsWith("CheckboxWidget", StringComparison.Ordinal);
+		}
+
+		static bool Disabled(Widget w)
+		{
+			try
+			{
+				var t = w.GetType();
+				object v = t.GetField("IsDisabled", BindingFlags.Public | BindingFlags.Instance)?.GetValue(w)
+					?? t.GetProperty("IsDisabled", BindingFlags.Public | BindingFlags.Instance)?.GetValue(w);
+				return v is Func<bool> f && f();
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		/// <summary>Finger-sized taps: if nothing clickable is under the point, use the nearest button within reach.</summary>
+		static int2 Snap(int2 pos)
+		{
+			Widget best = null;
+			var bestDist = double.MaxValue;
+			var inside = false;
+
+			void Visit(Widget w)
+			{
+				if (inside || !w.IsVisible())
+					return;
+
+				if (IsTarget(w) && !Disabled(w))
+				{
+					var r = w.EventBounds;
+					var dx = Math.Max(Math.Max(r.Left - pos.X, 0), pos.X - r.Right);
+					var dy = Math.Max(Math.Max(r.Top - pos.Y, 0), pos.Y - r.Bottom);
+					var d = Math.Sqrt(dx * dx + dy * dy);
+					if (d <= 0)
+					{
+						inside = true;
+						return;
+					}
+
+					if (d < bestDist)
+					{
+						bestDist = d;
+						best = w;
+					}
+				}
+
+				foreach (var c in w.Children)
+					Visit(c);
+			}
+
+			Visit(Ui.Root);
+			if (inside || best == null || bestDist > SnapRadius)
+				return pos;
+
+			var b = best.EventBounds;
+			return new int2(b.Left + b.Width / 2, b.Top + b.Height / 2);
+		}
+
 		void Click(IInputHandler h, MouseButton b, int2 pos, Modifiers mods)
 		{
+			if (b == MouseButton.Left)
+				pos = Snap(pos);
+
 			Send(h, MouseInputEvent.Move, MouseButton.None, pos, int2.Zero, mods);
 			Down(h, b, pos, mods);
 			Up(h, b, pos, mods);

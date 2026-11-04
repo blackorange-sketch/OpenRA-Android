@@ -303,6 +303,8 @@ namespace OpenRAHost
 			if (!engineReady)
 				return;
 
+			// A crash file from an earlier run must not be reported as the result of this one.
+			DiagnosticsReport.Clear(FilesRoot);
 			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale());
 
 			var intent = new Intent();
