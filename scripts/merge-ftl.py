@@ -47,14 +47,33 @@ def entries(text):
 
 
 def parse_translation(text):
-    whole, attrs = {}, {}
-    for key, lines in entries(text):
-        if key is None:
-            m = ATTR_PATCH.match(lines[0]) if lines else None
-            if m:
-                attrs.setdefault(m.group(1), {})[m.group(2)] = m.group(3)
+    """-> (whole messages, attribute patches).
+
+    An attribute patch is `id.attr = text`, optionally followed by indented continuation lines (multi-line
+    text). attrs[id][attr] = (first line text, [continuation lines]).
+    """
+    whole, attrs, rest = {}, {}, []
+    lines = text.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = ATTR_PATCH.match(line)
+        if m:
+            cont = []
+            i += 1
+            while i < len(lines) and (lines[i].startswith(" ") or lines[i].strip() == ""):
+                cont.append(lines[i])
+                i += 1
+            while cont and cont[-1].strip() == "":
+                cont.pop()
+            attrs.setdefault(m.group(1), {})[m.group(2)] = (m.group(3), cont)
             continue
-        whole[key] = "\n".join(lines).rstrip("\n")
+        rest.append(line)
+        i += 1
+
+    for key, ls in entries("\n".join(rest)):
+        if key is not None:
+            whole[key] = "\n".join(ls).rstrip("\n")
     return whole, attrs
 
 
@@ -73,14 +92,33 @@ def apply(en_text, whole, attrs, name):
             else:
                 print(f"  skip {name}:{key}: placeables differ {en_vars ^ ru_vars}")
         if key is not None and key in attrs:
-            new = []
-            for line in lines:
-                m = re.match(r"^(\s+)\.([\w-]+)(\s*=\s*)(.+)$", line)
-                if m and m.group(2) in attrs[key]:
-                    line = f"{m.group(1)}.{m.group(2)}{m.group(3)}{attrs[key][m.group(2)]}"
-                    replaced += 1
-                new.append(line)
-            lines = new
+            # Split the English entry into attribute blocks (`.attr = ...` plus its continuation lines).
+            blanks = []
+            while lines and lines[-1].strip() == "":
+                blanks.append(lines.pop())
+            head, blocks = [lines[0]], []
+            for line in lines[1:]:
+                m = re.match(r"^(\s+)\.([\w-]+)(\s*=\s*)(.*)$", line)
+                if m:
+                    blocks.append([m.group(1), m.group(2), [line]])
+                elif blocks:
+                    blocks[-1][2].append(line)
+                else:
+                    head.append(line)
+
+            new = list(head)
+            for indent, attr, blk in blocks:
+                if attr in attrs[key]:
+                    first, cont = attrs[key][attr]
+                    en_vars = set(VARS.findall("\n".join(blk)))
+                    ru_vars = set(VARS.findall(first + "\n".join(cont)))
+                    if en_vars <= ru_vars:
+                        blk = [f"{indent}.{attr} =" + (f" {first}" if first else "")] + cont
+                        replaced += 1
+                    else:
+                        print(f"  skip {name}:{key}.{attr}: placeables differ {en_vars ^ ru_vars}")
+                new.extend(blk)
+            lines = new + blanks
         out_entries.append((key, lines))
     return "\n".join("\n".join(l) for _, l in out_entries), replaced
 

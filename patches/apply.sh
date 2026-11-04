@@ -168,6 +168,28 @@ patch(
     "\t\t\treturn groups.GetActorsInControlGroup(group).Count();\n"
     "\t\t}\n",
 )
+# 9b. Pause a single-player game when the app loses focus (switching apps, notification shade, screen off).
+patch(
+    "OpenRA.Game/Game.cs",
+    "\t\tpublic static bool IsWorldPaused => worldRenderer?.World?.Paused == true;\n\n",
+    "\t\tpublic static bool IsWorldPaused => worldRenderer?.World?.Paused == true;\n\n"
+    "\t\t/// <summary>Android host: called when the window loses focus. Pauses a running game that has no other human players.</summary>\n"
+    "\t\tpublic static void PauseForBackground()\n"
+    "\t\t{\n"
+    "\t\t\tvar w = worldRenderer?.World;\n"
+    "\t\t\tif (w == null || w.Type != WorldType.Regular || w.LocalPlayer == null || w.IsGameOver || w.IsLoadingGameSave || w.Paused)\n"
+    "\t\t\t\treturn;\n\n"
+    "\t\t\tif (w.LobbyInfo.NonBotClients.Count() > 1)\n"
+    "\t\t\t\treturn;\n\n"
+    "\t\t\tw.SetPauseState(true);\n"
+    "\t\t}\n\n",
+)
+patch(
+    "OpenRA.Platforms.Default/Sdl2Input.cs",
+    "\t\t\t\t\t\t\tcase SDL.SDL_WindowEventID.SDL_WINDOWEVENT_FOCUS_LOST:\n\t\t\t\t\t\t\t\tdevice.HasInputFocus = false;\n",
+    "\t\t\t\t\t\t\tcase SDL.SDL_WindowEventID.SDL_WINDOWEVENT_FOCUS_LOST:\n\t\t\t\t\t\t\t\tdevice.HasInputFocus = false;\n"
+    "\t\t\t\t\t\t\t\tGame.PauseForBackground();\n",
+)
 # 10. Mission browser: one tab per house (the stock screen is a single long list of all campaigns).
 CB = "OpenRA.Mods.Common/Widgets/Logic/MissionBrowserLogic.cs"
 patch(
