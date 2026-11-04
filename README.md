@@ -1,7 +1,7 @@
 # OpenRA-Android
 
-Native Android port of [OpenRA](https://github.com/OpenRA/OpenRA), focused on the **Dune 2000** mod (`d2k`).
-The APK ships no game data: on first launch the user picks the folder with their own Dune 2000 files.
+Native Android port of [OpenRA](https://github.com/OpenRA/OpenRA): **Dune 2000** (`d2k`), plus **Red Alert** (`ra`), **Tiberian Dawn** (`cnc`) and **Tiberian Sun** (`ts`). The launcher picks the game.
+The APK ships no game data. Dune 2000: the user picks the folder with their own files. Red Alert / Tiberian Dawn / Tiberian Sun are freeware: the engine's own content installer (quick install) downloads them on first start.
 
 Pinned engine: `OpenRA/OpenRA` commit `9636b63eaee62fcb60ef2e896e7985bdf2f1ee68` (see `OPENRA_REF`).
 

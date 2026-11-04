@@ -20,6 +20,7 @@ namespace OpenRAHost
 		// Kept in a static field so the delegate (and its native thunk) is never collected.
 		static readonly MainDelegate EntryPoint = RunGame;
 
+		static string modId = "d2k";
 		static string engineDir;
 		static string supportDir;
 		static string uiScale = "1";
@@ -56,8 +57,9 @@ namespace OpenRAHost
 			}
 		}
 
-		public static void Configure(string engineRoot, string filesRoot, string scale, string inGameScale, int touchOffset, int frameCap, bool perfText)
+		public static void Configure(string mod, string engineRoot, string filesRoot, string scale, string inGameScale, int touchOffset, int frameCap, bool perfText)
 		{
+			modId = mod;
 			fpsCap = frameCap;
 			showFps = perfText;
 			uiScale = scale;
@@ -95,7 +97,7 @@ namespace OpenRAHost
 				{
 					"Engine.EngineDir=" + engineDir,
 					"Engine.SupportDir=" + supportDir,
-					"Game.Mod=d2k",
+					"Game.Mod=" + modId,
 					"Graphics.UIScale=" + uiScale,
 					"Game.MouseScroll=Standard",
 					"Game.MouseControlStyle=Classic",

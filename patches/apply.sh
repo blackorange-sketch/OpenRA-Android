@@ -195,7 +195,7 @@ CB = "OpenRA.Mods.Common/Widgets/Logic/MissionBrowserLogic.cs"
 patch(
     CB,
     "\t\tbool minifiedOptions = true;\n",
-    "\t\tbool minifiedOptions = true;\n\t\tstring campaignFilter = \"Atreides\";\n",
+    "\t\tbool minifiedOptions = true;\n\t\tstring campaignFilter = Game.ModData.Manifest.Id == \"d2k\" ? \"Atreides\" : \"\";\n",
 )
 patch(
     CB,

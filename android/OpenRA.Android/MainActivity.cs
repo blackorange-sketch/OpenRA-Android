@@ -18,7 +18,7 @@ namespace OpenRAHost
 	/// Launcher: shows whether the game files are present, imports them from a folder the player picks,
 	/// unpacks the engine payload and starts the SDL activity.
 	/// </summary>
-	[Activity(Label = "Dune 2000", MainLauncher = true, Exported = true,
+	[Activity(Label = "OpenRA", MainLauncher = true, Exported = true,
 		ScreenOrientation = ScreenOrientation.SensorLandscape,
 		Theme = "@android:style/Theme.Material.NoActionBar")]
 	public class MainActivity : Activity
@@ -39,6 +39,13 @@ namespace OpenRAHost
 		bool busy;
 		string busyText = "";
 		string lastImportNote;
+
+		// Which game the launcher shows and starts (OpenRA mod id).
+		string SelectedGame
+		{
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetString("game", "d2k");
+			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutString("game", value).Apply();
+		}
 
 		string VoiceFolder
 		{
@@ -152,7 +159,9 @@ namespace OpenRAHost
 
 		void BuildMain()
 		{
-			var contentOk = ContentImporter.IsInstalled(FilesRoot);
+			var game = Games.ById(SelectedGame);
+			var isDune = game.Id == "d2k";
+			var contentOk = Games.IsInstalled(game, FilesRoot);
 
 			var root = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			root.SetBackgroundColor(Bg);
@@ -162,12 +171,28 @@ namespace OpenRAHost
 			// Left: title
 			var left = new LinearLayout(this) { Orientation = Orientation.Vertical };
 			left.SetGravity(GravityFlags.CenterVertical);
-			left.AddView(MakeText("DUNE", 44, Gold, true));
-			left.AddView(MakeText("2000", 44, Gold, true));
-			var sub = MakeText("OpenRA для Android", 16, Dim);
-			sub.SetPadding(0, Dp(8), 0, 0);
+			left.AddView(MakeText(game.Line1, 34, Gold, true));
+			left.AddView(MakeText(game.Line2, 34, Gold, true));
+			var sub = MakeText("OpenRA для Android", 15, Dim);
+			sub.SetPadding(0, Dp(4), 0, Dp(10));
 			left.AddView(sub);
-			root.AddView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 0.8f));
+
+			foreach (var g in Games.All)
+			{
+				var gid = g.Id;
+				var pick = MakeButton(g.Name, gid == game.Id, true, () =>
+				{
+					SelectedGame = gid;
+					BuildMain();
+				});
+				pick.TextSize = 15;
+				pick.SetMinimumHeight(Dp(44));
+				left.AddView(pick, ButtonParams(Dp(6)));
+			}
+
+			var leftScroll = new ScrollView(this) { FillViewport = true };
+			leftScroll.AddView(left);
+			root.AddView(leftScroll, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 0.8f));
 
 			// Right: card
 			var scroll = new ScrollView(this) { FillViewport = true };
@@ -178,15 +203,21 @@ namespace OpenRAHost
 
 			card.AddView(MakeText("Файли гри", 14, Dim));
 			var status = MakeText(
-				contentOk ? "✔ Файли Dune 2000 імпортовано" : "✖ Файли гри ще не додані",
-				20, contentOk ? Good : Bad, true);
+				isDune
+					? (contentOk ? "✔ Файли Dune 2000 імпортовано" : "✖ Файли гри ще не додані")
+					: (contentOk ? "✔ Файли гри встановлені" : "ℹ Файли ще не встановлені"),
+				20, contentOk ? Good : (isDune ? Bad : Dim), true);
 			status.SetPadding(0, Dp(4), 0, Dp(4));
 			card.AddView(status);
 
 			var hint = MakeText(
-				contentOk
-					? "Можна грати. Щоб оновити файли, імпортуйте папку ще раз."
-					: "Натисніть «Імпортувати» і виберіть папку з вашою грою Dune 2000 (там, де лежать BLOXBASE.R16, SOUND.RS, папки GAMESFX, Movies, Music).",
+				isDune
+					? (contentOk
+						? "Можна грати. Щоб оновити файли, імпортуйте папку ще раз."
+						: "Натисніть «Імпортувати» і виберіть папку з вашою грою Dune 2000 (там, де лежать BLOXBASE.R16, SOUND.RS, папки GAMESFX, Movies, Music).")
+					: (contentOk
+						? "Можна грати."
+						: "Натисніть «Грати». При першому запуску гра запропонує встановити вміст: виберіть швидке встановлення, безкоштовна версія завантажиться з інтернету (потрібен інтернет)."),
 				14, Dim);
 			hint.SetPadding(0, 0, 0, Dp(10));
 			card.AddView(hint);
@@ -215,12 +246,15 @@ namespace OpenRAHost
 			}
 			else
 			{
-				var play = MakeButton("▶  Грати", true, contentOk && engineReady, Launch);
+				var play = MakeButton("▶  Грати", true, (contentOk || !isDune) && engineReady, Launch);
 				card.AddView(play, ButtonParams(0));
 
-				var import = MakeButton(contentOk ? "Імпортувати знову" : "Імпортувати файли гри", !contentOk,
-					true, StartPicker);
-				card.AddView(import, ButtonParams(Dp(10)));
+				if (isDune)
+				{
+					var import = MakeButton(contentOk ? "Імпортувати знову" : "Імпортувати файли гри", !contentOk,
+						true, StartPicker);
+					card.AddView(import, ButtonParams(Dp(10)));
+				}
 
 				var calib = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 				calib.SetGravity(GravityFlags.CenterVertical);
@@ -232,11 +266,14 @@ namespace OpenRAHost
 					new LinearLayout.LayoutParams(Dp(64), ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(8) });
 				card.AddView(calib, ButtonParams(Dp(10)));
 
-				var russian = VoiceFolder == "GAMESFXRus";
-				card.AddView(MakeButton("Озвучка: " + (russian ? "російська" : "оригінальна (англ.)") + "  — змінити",
-					false, true, () => { VoiceFolder = russian ? "GAMESFX" : "GAMESFXRus"; BuildMain(); }),
-					ButtonParams(Dp(10)));
-				card.AddView(MakeText("Озвучка застосовується при наступному імпорті файлів.", 12, Dim));
+				if (isDune)
+				{
+					var russian = VoiceFolder == "GAMESFXRus";
+					card.AddView(MakeButton("Озвучка: " + (russian ? "російська" : "оригінальна (англ.)") + "  — змінити",
+						false, true, () => { VoiceFolder = russian ? "GAMESFX" : "GAMESFXRus"; BuildMain(); }),
+						ButtonParams(Dp(10)));
+					card.AddView(MakeText("Озвучка застосовується при наступному імпорті файлів.", 12, Dim));
+				}
 
 				var lang = TextLanguage;
 				card.AddView(MakeButton("Мова тексту: " + (lang == "ru" ? "російська" : "English") + "  — змінити",
@@ -399,7 +436,7 @@ namespace OpenRAHost
 			// A crash file from an earlier run must not be reported as the result of this one.
 			DiagnosticsReport.Clear(FilesRoot);
 			ApplyTextLanguage();
-			OpenRAEntry.Configure(engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy, FpsCap, ShowFps);
+			OpenRAEntry.Configure(SelectedGame, engineRoot, FilesRoot, ComputeUiScale(false), ComputeUiScale(true), TouchDy, FpsCap, ShowFps);
 
 			var intent = new Intent();
 			intent.SetClassName(this, "org.openra.android.OpenRAActivity");

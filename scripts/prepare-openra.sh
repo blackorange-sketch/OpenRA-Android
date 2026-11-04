@@ -31,7 +31,7 @@ echo "==> Staging payload"
 rm -rf "$STAGE"; mkdir -p "$STAGE/bin" "$STAGE/mods"
 cp "$OPENRA"/bin/*.dll "$STAGE/bin/"
 cp "$OPENRA"/bin/*.deps.json "$STAGE/bin/" 2>/dev/null || true
-for mod in all common common-content d2k d2k-content; do
+for mod in all common common-content d2k d2k-content ra ra-content cnc cnc-content ts ts-content; do
 	cp -r "$OPENRA/mods/$mod" "$STAGE/mods/$mod"
 done
 cp -r "$OPENRA/glsl" "$STAGE/glsl"
