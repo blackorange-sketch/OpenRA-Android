@@ -14,10 +14,12 @@ root = pathlib.Path(sys.argv[1])
 
 def patch(rel, old, new):
     p = root / rel
-    s = p.read_text(encoding="utf-8", newline="")
+    with open(p, encoding="utf-8", newline="") as f:
+        s = f.read()
     if s.count(old) != 1:
         sys.exit(f"patch anchor not found exactly once in {rel}: {old!r}")
-    p.write_text(s.replace(old, new), encoding="utf-8", newline="")
+    with open(p, "w", encoding="utf-8", newline="") as f:
+        f.write(s.replace(old, new))
     print(f"patched {rel}")
 
 # 1. Binaries live in the extracted payload, not next to the process.

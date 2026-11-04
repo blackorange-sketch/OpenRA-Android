@@ -60,6 +60,7 @@ cp -r "$SRC/sdl2/android-project/app/src/main/java/." "$WORK/sdl-java/"
 # ---- OpenAL Soft ----
 fetch "https://github.com/kcat/openal-soft/archive/refs/tags/$OAL_VER.tar.gz" "$SRC/openal"
 cmake_build "$SRC/openal" "$WORK/build-openal" -DLIBTYPE=SHARED \
+	"-DCMAKE_CXX_FLAGS=-include cstdlib" \
 	-DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_TESTS=OFF -DALSOFT_INSTALL=OFF
 cp -L "$WORK/build-openal/libopenal.so" "$OUT/libsoft_oal.so"
 
@@ -73,7 +74,7 @@ cp -L "$FT_SO" "$OUT/libfreetype6.so"
 
 # ---- Lua 5.1 (plain C, built directly) ----
 fetch "https://www.lua.org/ftp/lua-$LUA_VER.tar.gz" "$SRC/lua"
-mapfile -t LUA_SOURCES < <(find "$SRC/lua/src" -name '*.c' ! -name 'lua.c' ! -name 'luac.c' | sort)
+mapfile -t LUA_SOURCES < <(find "$SRC/lua/src" -name '*.c' ! -name 'lua.c' ! -name 'luac.c' ! -name 'print.c' | sort)
 "$CC" -shared -fPIC -O2 -DLUA_USE_POSIX -o "$OUT/liblua51.so" "${LUA_SOURCES[@]}" -lm
 
 # ---- SDL_main bridge ----

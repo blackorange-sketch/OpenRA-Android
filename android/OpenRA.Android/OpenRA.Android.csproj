@@ -33,7 +33,7 @@
 		<AndroidNativeLibrary Include="lib\arm64-v8a\*.so">
 			<Abi>arm64-v8a</Abi>
 		</AndroidNativeLibrary>
-		<!-- Built by scripts/build-java.sh: SDLActivity + OpenRAActivity, dexed without bindings -->
-		<AndroidJavaLibrary Include="libs\openra-java.jar" />
+		<!-- Built by scripts/build-java.sh: SDLActivity + OpenRAActivity, packaged and dexed, not bound -->
+		<AndroidLibrary Include="libs\openra-java.jar" Bind="false" />
 	</ItemGroup>
 </Project>
