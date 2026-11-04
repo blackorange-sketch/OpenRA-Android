@@ -101,6 +101,21 @@ patch(
     "\t\t\tif (float.TryParse(hostScale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var hostScaleValue))\n"
     "\t\t\t\tRenderer.SetUIScale(hostScaleValue);\n\n",
 )
+
+# 8. Hook that lets the touch layer draw feedback (long-press ring) on top of the UI.
+patch(
+    "OpenRA.Game/Game.cs",
+    "\t\t\t\t\tUi.Draw();\n",
+    "\t\t\t\t\tUi.Draw();\n\t\t\t\t\tTouchOverlay?.Invoke();\n",
+)
+patch(
+    "OpenRA.Game/Game.cs",
+    "\t\tpublic static bool IsPlacingBuilding =>\n",
+    "\t\tpublic static Action TouchOverlay;\n\n\t\tpublic static bool IsPlacingBuilding =>\n",
+)
 PY
+
+# 9. Finger-sized in-game command bar.
+python3 "$(dirname "$0")/touch-ui.py" "$OPENRA"
 
 cp "$(dirname "$0")/files/Sdl2Touch.cs" "$OPENRA/OpenRA.Platforms.Default/Sdl2Touch.cs"

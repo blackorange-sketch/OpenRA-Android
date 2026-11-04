@@ -10,7 +10,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Numerics;
 using System.Reflection;
+using OpenRA.Primitives;
 using OpenRA.Widgets;
 using SDL2;
 
@@ -96,6 +98,41 @@ namespace OpenRA.Platforms.Default
 		bool placePending;
 		float placeX, placeY;
 		const float PlaceLift = 0.09f; // ghost is drawn this fraction of the screen height above the finger while dragging
+
+		Func<int, int, int2> lastToPos;
+
+		public Sdl2Touch()
+		{
+			Game.TouchOverlay = DrawOverlay;
+		}
+
+		// Ring that fills while a finger is held; full and bright once the long press is armed.
+		void DrawOverlay()
+		{
+			if (lastToPos == null || fingers.Count != 1 || (mode != Mode.Pending && mode != Mode.LongPress))
+				return;
+
+			var fi = fingers[order[0]];
+			var held = SDL.SDL_GetTicks() - fi.StartTick;
+			if (mode == Mode.Pending && held < 120)
+				return;
+
+			var t = mode == Mode.LongPress ? 1f : Math.Min(1f, held / (float)LongPressMs);
+			var c = lastToPos((int)fi.StartX, (int)fi.StartY);
+			var color = mode == Mode.LongPress ? Color.FromArgb(230, 255, 215, 90) : Color.FromArgb(170, 255, 255, 255);
+			var radius = 24f;
+			var segments = 32;
+			var count = Math.Max(1, (int)(segments * t));
+			var rc = Game.Renderer.RgbaColorRenderer;
+			for (var i = 0; i < count; i++)
+			{
+				var a0 = -Math.PI / 2 + 2 * Math.PI * i / segments;
+				var a1 = -Math.PI / 2 + 2 * Math.PI * (i + 1) / segments;
+				var p0 = new Vector2(c.X + radius * (float)Math.Cos(a0), c.Y + radius * (float)Math.Sin(a0));
+				var p1 = new Vector2(c.X + radius * (float)Math.Cos(a1), c.Y + radius * (float)Math.Sin(a1));
+				rc.DrawLine(p0, p1, mode == Mode.LongPress ? 4 : 3, color);
+			}
+		}
 
 		float scrollAccum, lastTapX, lastTapY;
 		uint lastTapTick;
@@ -245,6 +282,7 @@ namespace OpenRA.Platforms.Default
 			var y = Math.Max(0, f.y * height - TouchDy);
 			int2 P(float px, float py) => toPos((int)px, (int)py);
 
+			lastToPos = toPos;
 			if (!geometryLogged)
 				LogGeometry(device);
 
@@ -511,6 +549,7 @@ namespace OpenRA.Platforms.Default
 		/// <summary>Called once per input pump: fires the long-press right click.</summary>
 		public void Tick(Sdl2PlatformWindow device, IInputHandler h, Modifiers mods, Func<int, int, int2> toPos)
 		{
+			lastToPos = toPos;
 			if (mode != Mode.Pending || fingers.Count != 1)
 				return;
 
