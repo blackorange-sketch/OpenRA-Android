@@ -54,7 +54,7 @@ namespace OpenRAHost
 			return list;
 		}
 
-		public static ImportResult Import(Context ctx, Android.Net.Uri tree, string filesRoot, Action<string> progress)
+		public static ImportResult Import(Context ctx, Android.Net.Uri tree, string filesRoot, string voiceFolder, Action<string> progress)
 		{
 			var result = new ImportResult();
 			try
@@ -65,9 +65,9 @@ namespace OpenRAHost
 				result.MusicTotal = manifest.Count(m => m.Kind == "music");
 
 				progress("Шукаю файли у вибраній папці…");
-				var index = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+				var index = new Dictionary<string, List<Candidate>>(StringComparer.OrdinalIgnoreCase);
 				var found = 0;
-				Walk(ctx, tree, DocumentsContract.GetTreeDocumentId(tree), index, ref found, progress, 0);
+				Walk(ctx, tree, DocumentsContract.GetTreeDocumentId(tree), "", false, voiceFolder, index, ref found, progress, 0);
 
 				var dir = ContentDir(filesRoot);
 				var done = 0;
@@ -75,7 +75,7 @@ namespace OpenRAHost
 				{
 					done++;
 					var name = Path.GetFileName(dest);
-					if (!index.TryGetValue(name, out var docId))
+					if (!index.TryGetValue(name, out var candidates))
 					{
 						if (kind == "base")
 							result.MissingBase.Add(dest);
@@ -85,6 +85,7 @@ namespace OpenRAHost
 					if (done % 10 == 0)
 						progress($"Копіюю {done} з {manifest.Count}…");
 
+					var docId = candidates.OrderBy(c => Score(c, dest, voiceFolder)).First().DocId;
 					var target = Path.Combine(dir, dest);
 					Directory.CreateDirectory(Path.GetDirectoryName(target));
 					var docUri = DocumentsContract.BuildDocumentUriUsingTree(tree, docId);
@@ -110,8 +111,36 @@ namespace OpenRAHost
 			return result;
 		}
 
-		static void Walk(Context ctx, Android.Net.Uri tree, string docId, Dictionary<string, string> index,
-			ref int found, Action<string> progress, int depth)
+		sealed class Candidate
+		{
+			public string DocId, Parent;
+			public bool InData;
+		}
+
+		// Lower is better. The game folder can hold several copies of a file (language variants, mods);
+		// prefer the ones the game itself uses: Data/<file> and Data/GAMESFX (or the chosen voice folder).
+		static int Score(Candidate c, string dest, string voiceFolder)
+		{
+			var inData = c.InData ? 0 : 20;
+			if (dest.StartsWith("GAMESFX/", StringComparison.Ordinal))
+			{
+				if (string.Equals(c.Parent, voiceFolder, StringComparison.OrdinalIgnoreCase))
+					return inData;
+				return inData + (string.Equals(c.Parent, "GAMESFX", StringComparison.OrdinalIgnoreCase) ? 1 : 9);
+			}
+
+			return inData + (string.Equals(c.Parent, "Data", StringComparison.OrdinalIgnoreCase) ? 0
+				: dest.Contains('/') && string.Equals(c.Parent, dest.Substring(0, dest.IndexOf('/')), StringComparison.OrdinalIgnoreCase) ? 0 : 5);
+		}
+
+		static readonly HashSet<string> SkipDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		{
+			"CustomCampaignData", "CnCNet5", "MissionLauncherBackups", "Map and Mission Editor",
+			"Missions", "maps", "UI_GFX", "UI_DATA", "bin"
+		};
+
+		static void Walk(Context ctx, Android.Net.Uri tree, string docId, string folderName, bool inData, string voiceFolder,
+			Dictionary<string, List<Candidate>> index, ref int found, Action<string> progress, int depth)
 		{
 			if (depth > 8)
 				return;
@@ -124,7 +153,7 @@ namespace OpenRAHost
 				DocumentsContract.Document.ColumnMimeType
 			};
 
-			var subdirs = new List<string>();
+			var subdirs = new List<(string Id, string Name)>();
 			using (var cursor = ctx.ContentResolver.Query(children, cols, null, null, null))
 			{
 				if (cursor == null)
@@ -136,18 +165,32 @@ namespace OpenRAHost
 					var name = cursor.GetString(1);
 					var mime = cursor.GetString(2);
 					if (mime == DocumentsContract.Document.MimeTypeDir)
-						subdirs.Add(id);
-					else if (name != null && !index.ContainsKey(name))
+						subdirs.Add((id, name ?? ""));
+					else if (name != null)
 					{
-						index[name] = id;
+						if (!index.TryGetValue(name, out var list))
+							index[name] = list = new List<Candidate>();
+						list.Add(new Candidate { DocId = id, Parent = folderName, InData = inData });
 						found++;
 					}
 				}
 			}
 
 			progress($"Знайдено файлів: {found}");
-			foreach (var sub in subdirs)
-				Walk(ctx, tree, sub, index, ref found, progress, depth + 1);
+			foreach (var (id, name) in subdirs)
+			{
+				if (SkipDirs.Contains(name))
+					continue;
+
+				// Other languages' voice folders are not needed (GAMESFXRus, GAMESFXFre, ...).
+				if (name.StartsWith("GAMESFX", StringComparison.OrdinalIgnoreCase)
+					&& !name.Equals("GAMESFX", StringComparison.OrdinalIgnoreCase)
+					&& !name.Equals(voiceFolder, StringComparison.OrdinalIgnoreCase))
+					continue;
+
+				Walk(ctx, tree, id, name, inData || name.Equals("Data", StringComparison.OrdinalIgnoreCase),
+					voiceFolder, index, ref found, progress, depth + 1);
+			}
 		}
 	}
 }

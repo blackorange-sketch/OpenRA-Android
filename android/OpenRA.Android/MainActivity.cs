@@ -40,6 +40,12 @@ namespace OpenRAHost
 		string busyText = "";
 		string lastImportNote;
 
+		string VoiceFolder
+		{
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetString("voice", "GAMESFX");
+			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutString("voice", value).Apply();
+		}
+
 		int TouchDy
 		{
 			get => GetSharedPreferences("openra", FileCreationMode.Private).GetInt("touch_dy", 30);
@@ -181,6 +187,12 @@ namespace OpenRAHost
 					new LinearLayout.LayoutParams(Dp(64), ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(8) });
 				card.AddView(calib, ButtonParams(Dp(10)));
 
+				var russian = VoiceFolder == "GAMESFXRus";
+				card.AddView(MakeButton("Озвучка: " + (russian ? "російська" : "оригінальна (англ.)") + "  — змінити",
+					false, true, () => { VoiceFolder = russian ? "GAMESFX" : "GAMESFXRus"; BuildMain(); }),
+					ButtonParams(Dp(10)));
+				card.AddView(MakeText("Озвучка застосовується при наступному імпорті файлів.", 12, Dim));
+
 				var diag = MakeButton("Діагностика", false, true,
 					() => ShowReport(engineError ?? DiagnosticsReport.BuildAlways(FilesRoot), false));
 				card.AddView(diag, ButtonParams(Dp(10)));
@@ -279,7 +291,7 @@ namespace OpenRAHost
 
 			Task.Run(() =>
 			{
-				var result = ContentImporter.Import(this, tree, FilesRoot, msg =>
+				var result = ContentImporter.Import(this, tree, FilesRoot, VoiceFolder, msg =>
 				{
 					busyText = msg;
 					RunOnUiThread(() => BuildMain());
