@@ -222,6 +222,67 @@ patch(
     "\t\t\t\t\tvar path = sourceResolver.FindSourcePath(kv.Value) ?? InstallerUtils.FindImportedSource(kv.Value);\n",
 )
 
+# 9d. Android host: after the launcher imported a game folder it writes SupportDir/Import/AUTO. The content installer
+#     then skips every prompt, installs all packages from the imported source and goes straight into the game.
+patch(
+    "OpenRA.Mods.Common/Installer/InstallerUtils.cs",
+    "\t\tpublic static string FindImportedSource(",
+    "\t\tpublic static bool AutoInstallRequested() => File.Exists(Path.Combine(Platform.SupportDir, \"Import\", \"AUTO\"));\n\n"
+    "\t\tpublic static void ClearAutoInstall()\n"
+    "\t\t{\n"
+    "\t\t\ttry\n"
+    "\t\t\t{\n"
+    "\t\t\t\tFile.Delete(Path.Combine(Platform.SupportDir, \"Import\", \"AUTO\"));\n"
+    "\t\t\t}\n"
+    "\t\t\tcatch (Exception)\n"
+    "\t\t\t{\n"
+    "\t\t\t}\n"
+    "\t\t}\n\n"
+    "\t\tpublic static string FindImportedSource(",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Installation/ModContentLogic.cs",
+    "\t\t\tif (!IsModInstalled(content))\n",
+    "\t\t\tif (!IsModInstalled(content) && !OpenRA.Mods.Common.Installer.InstallerUtils.AutoInstallRequested())\n",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Installation/ModContentLogic.cs",
+    "\t\t\tbackButton.OnClick = () => { Ui.CloseWindow(); onCancel(); };\n\n\t\t\tPopulateContentList();\n",
+    "\t\t\tbackButton.OnClick = () => { Ui.CloseWindow(); onCancel(); };\n\n\t\t\tPopulateContentList();\n\n"
+    "\t\t\tif (OpenRA.Mods.Common.Installer.InstallerUtils.AutoInstallRequested())\n"
+    "\t\t\t\tGame.RunAfterTick(() => sourceButton.OnClick());\n",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Installation/InstallFromSourceLogic.cs",
+    "\t\tvoid DetectContentSources()\n\t\t{\n",
+    "\t\tbool autoInstall;\n\n"
+    "\t\tvoid DetectContentSources()\n\t\t{\n"
+    "\t\t\tvar auto = InstallerUtils.AutoInstallRequested();\n"
+    "\t\t\tif (auto)\n"
+    "\t\t\t\tInstallerUtils.ClearAutoInstall();\n\n",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Installation/InstallFromSourceLogic.cs",
+    "\t\t\t\t\t\t// Ignore source if content is already installed\n",
+    "\t\t\t\t\t\tif (auto && availablePackages.Length != 0)\n"
+    "\t\t\t\t\t\t{\n"
+    "\t\t\t\t\t\t\tselectedPackages = availablePackages.ToDictionary(x => x.Identifier, y => true);\n"
+    "\t\t\t\t\t\t\tautoInstall = true;\n"
+    "\t\t\t\t\t\t\tvar autoSource = kv.Value;\n"
+    "\t\t\t\t\t\t\tGame.RunAfterTick(() => InstallFromSource(path, autoSource));\n"
+    "\t\t\t\t\t\t\treturn;\n"
+    "\t\t\t\t\t\t}\n\n"
+    "\t\t\t\t\t\t// Ignore source if content is already installed\n",
+)
+patch(
+    "OpenRA.Mods.Common/Widgets/Logic/Installation/InstallFromSourceLogic.cs",
+    "\t\t\t\t\tGame.RunAfterTick(Ui.CloseWindow);\n",
+    "\t\t\t\t\tif (autoInstall)\n"
+    "\t\t\t\t\t\tGame.RunAfterTick(() => Game.InitializeMod(Game.Mods[content.Mod], new Arguments()));\n"
+    "\t\t\t\t\telse\n"
+    "\t\t\t\t\t\tGame.RunAfterTick(Ui.CloseWindow);\n",
+)
+
 # 10. Mission browser: one tab per house (the stock screen is a single long list of all campaigns).
 CB = "OpenRA.Mods.Common/Widgets/Logic/MissionBrowserLogic.cs"
 patch(

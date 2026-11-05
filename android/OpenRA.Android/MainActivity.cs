@@ -262,7 +262,7 @@ namespace OpenRAHost
 					card.AddView(MakeButton("Імпортувати файли гри (відео, музика)", false, true, StartPicker),
 						ButtonParams(Dp(10)));
 					card.AddView(MakeText(
-						"Вибрати папку зі Steam/Origin-версією або дисками. Потім натисніть «Встановити / докачати вміст»: гра сама розпакує відео й музику.",
+						"Вибрати папку зі Steam/Origin/Remastered-версією або дисками: файли скопіюються, гра сама розпакує все потрібне (відео, музику) і запуститься.",
 						12, Dim));
 					if (SourceImporter.HasImport(FilesRoot))
 						card.AddView(MakeButton("Видалити скопійовані файли імпорту (звільнити місце)", false, true, () =>
@@ -418,8 +418,26 @@ namespace OpenRAHost
 						? "Помилка імпорту: " + error
 						: files == 0
 							? "У вибраній папці не знайдено потрібних файлів. Виберіть папку встановленої гри або диска."
-							: $"Скопійовано файлів: {files} ({bytes / 1048576} МБ). Тепер натисніть «Встановити / докачати вміст».";
+							: $"Скопійовано файлів: {files} ({bytes / 1048576} МБ).";
 					busy = false;
+
+					if (error == null && files > 0)
+					{
+						// The engine installer picks the imported folder up on its own and goes into the game when done.
+						try
+						{
+							System.IO.File.WriteAllText(System.IO.Path.Combine(SourceImporter.ImportRoot(FilesRoot), "AUTO"), "1");
+						}
+						catch
+						{
+							// the manual button still works
+						}
+
+						var gameId = SelectedGame;
+						RunOnUiThread(() => Launch(gameId + "-content"));
+						return;
+					}
+
 					RunOnUiThread(BuildMain);
 					return;
 				}
