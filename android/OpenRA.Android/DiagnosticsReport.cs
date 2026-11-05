@@ -38,7 +38,16 @@ namespace OpenRAHost
 			var sb = new StringBuilder();
 			sb.AppendLine(head);
 
-			foreach (var name in new[] { "window.log", "touch.log", "graphics.log", "exception.log", "debug.log" })
+			var importDir = Path.Combine(filesRoot, "support", "Import");
+			if (Directory.Exists(importDir))
+			{
+				sb.AppendLine();
+				sb.AppendLine("--- Import (files copied by the launcher) ---");
+				foreach (var f in Directory.EnumerateFiles(importDir, "*", SearchOption.AllDirectories).Take(60))
+					sb.AppendLine(Path.GetRelativePath(importDir, f) + "  " + new FileInfo(f).Length / 1048576 + " MB");
+			}
+
+			foreach (var name in new[] { "install.log", "window.log", "touch.log", "graphics.log", "exception.log", "debug.log" })
 			{
 				var path = Path.Combine(filesRoot, "support", "Logs", name);
 				if (!File.Exists(path))
