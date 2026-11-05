@@ -366,8 +366,8 @@ patch(
     "\t\t\t\t\t\tvar won = world.LocalPlayer.WinState == WinState.Won;\n"
     "\t\t\t\t\t\tvar video = won ? missionData.WinVideo : missionData.LossVideo;\n"
     "\t\t\t\t\t\tif (string.IsNullOrEmpty(video))\n"
-    "\t\t\t\t\t\t\tvideo = CampaignProgress.EndVideo(world.Map.Title, won);\n\n"
-    "\t\t\t\t\t\tCampaignProgress.RecordResult(world.Map.Title, won);\n",
+    "\t\t\t\t\t\t\tvideo = CampaignProgress.EndVideo(world.Map.Uid, won);\n\n"
+    "\t\t\t\t\t\tCampaignProgress.RecordResult(world.Map.Uid, won);\n",
 )
 patch(
     "OpenRA.Mods.Common/Widgets/Logic/MainMenuLogic.cs",
@@ -391,7 +391,7 @@ patch(
     "\t\t\t\tvar label = item.Get<LabelWithTooltipWidget>(\"TITLE\");\n",
     "\t\t\t\tvar label = item.Get<LabelWithTooltipWidget>(\"TITLE\");\n"
     "\t\t\t\tvar normalColor = label.GetColor();\n"
-    "\t\t\t\tlabel.GetColor = () => CampaignProgress.IsDone(preview.Title) ? OpenRA.Primitives.Color.FromArgb(255, 120, 230, 120) : normalColor;\n",
+    "\t\t\t\tlabel.GetColor = () => CampaignProgress.IsDone(preview) ? OpenRA.Primitives.Color.FromArgb(255, 120, 230, 120) : normalColor;\n",
 )
 
 # After a win the game leaves to the menu by itself (the next mission is opened there).

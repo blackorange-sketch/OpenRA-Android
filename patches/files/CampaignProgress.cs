@@ -1,7 +1,7 @@
-// Campaign flow for the d2k missions. Added by the OpenRA-Android port (not part of upstream).
+// Campaign flow for the d2k, Red Alert and Tiberian Dawn missions. Added by the OpenRA-Android port (not part of upstream).
 //
 // Remembers which missions were won (stored in the support dir), picks the mission that follows a victory
-// (next level of the same house; the "a" variant first, the "b" variant is one tap away in the list),
+// (next level of the same side; the "a" variant first, the others are one tap away in the list),
 // reopens a failed mission for another try, and names the ending / defeat videos to play.
 using System;
 using System.Collections.Generic;
@@ -13,7 +13,36 @@ namespace OpenRA.Mods.Common
 {
 	public static class CampaignProgress
 	{
-		static readonly Regex Name = new(@"^(Atreides|Harkonnen|Ordos) (\d\d)([ab]?)$", RegexOptions.Compiled);
+		// Dune 2000 maps are told apart by title ("Atreides 01a"); Red Alert / Tiberian Dawn by folder name ("allies-03b").
+		static readonly Regex DuneName = new(@"^(Atreides|Harkonnen|Ordos) (\d\d)([ab]?)$", RegexOptions.Compiled);
+		static readonly Regex FolderName = new(@"^(allies|soviet|gdi|nod)-?(\d\d)([abc]?)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+		sealed class Mission
+		{
+			public string Key, Side, Variant;
+			public int Level;
+		}
+
+		static Mission Parse(MapPreview p)
+		{
+			if (p == null)
+				return null;
+
+			if (p.Title != null && DuneName.Match(p.Title) is { Success: true } d)
+				return new Mission { Key = p.Title, Side = d.Groups[1].Value, Level = int.Parse(d.Groups[2].Value), Variant = d.Groups[3].Value };
+
+			var folder = p.Path == null ? null : Path.GetFileName(p.Path.TrimEnd('/', '\\'));
+			if (folder != null && FolderName.Match(folder) is { Success: true } f)
+				return new Mission
+				{
+					Key = folder.ToLowerInvariant(),
+					Side = f.Groups[1].Value.ToLowerInvariant(),
+					Level = int.Parse(f.Groups[2].Value),
+					Variant = f.Groups[3].Value.ToLowerInvariant()
+				};
+
+			return null;
+		}
 
 		static readonly HashSet<string> Done = new();
 		static bool loaded;
@@ -41,10 +70,11 @@ namespace OpenRA.Mods.Common
 			}
 		}
 
-		public static bool IsDone(string title)
+		public static bool IsDone(MapPreview preview)
 		{
 			Load();
-			return title != null && Done.Contains(title);
+			var m = Parse(preview);
+			return m != null && Done.Contains(m.Key);
 		}
 
 		static IEnumerable<MapPreview> Missions() =>
@@ -52,20 +82,17 @@ namespace OpenRA.Mods.Common
 				&& p.Visibility.HasFlag(MapVisibility.MissionSelector) && p.Title != null);
 
 		/// <summary>Called when a campaign mission ends. A win queues the next mission, a loss queues a retry.</summary>
-		public static void RecordResult(string title, bool won)
+		public static void RecordResult(string mapUid, bool won)
 		{
 			Load();
-			var m = title == null ? null : Name.Match(title);
-			if (m == null || !m.Success)
+			var current = Parse(Game.ModData.MapCache[mapUid]);
+			if (current == null)
 				return;
-
-			var house = m.Groups[1].Value;
-			var level = int.Parse(m.Groups[2].Value);
 
 			MapPreview target;
 			if (won)
 			{
-				if (Done.Add(title))
+				if (Done.Add(current.Key))
 				{
 					try
 					{
@@ -77,13 +104,21 @@ namespace OpenRA.Mods.Common
 					}
 				}
 
-				target = Missions()
-					.Where(p => Name.Match(p.Title) is { Success: true } n && n.Groups[1].Value == house && int.Parse(n.Groups[2].Value) == level + 1)
-					.OrderBy(p => p.Title, StringComparer.Ordinal)
+				// The next level of the same side that exists (Red Alert skips 11 and 12); its "a" variant comes first.
+				var candidates = Missions()
+					.Select(p => (Preview: p, Info: Parse(p)))
+					.Where(x => x.Info != null && x.Info.Side == current.Side && x.Info.Level > current.Level)
+					.ToList();
+
+				var nextLevel = candidates.Count == 0 ? 0 : candidates.Min(x => x.Info.Level);
+				target = candidates
+					.Where(x => x.Info.Level == nextLevel)
+					.OrderBy(x => x.Info.Variant, StringComparer.Ordinal)
+					.Select(x => x.Preview)
 					.FirstOrDefault();
 			}
 			else
-				target = Missions().FirstOrDefault(p => p.Title == title);
+				target = Missions().FirstOrDefault(p => p.Uid == mapUid);
 
 			pendingUid = target?.Uid;
 			autoBriefing = target != null;
@@ -108,18 +143,19 @@ namespace OpenRA.Mods.Common
 			return v;
 		}
 
-		/// <summary>Defeat video for any mission, ending video after the last level of a house. Null if there is none.</summary>
-		public static string EndVideo(string title, bool won)
+		/// <summary>Dune 2000 only: defeat video for any mission, ending video after the last level of a house.</summary>
+		public static string EndVideo(string mapUid, bool won)
 		{
-			var m = title == null ? null : Name.Match(title);
-			if (m == null || !m.Success)
+			var preview = Game.ModData.MapCache[mapUid];
+			if (preview?.Title == null || !DuneName.IsMatch(preview.Title))
 				return null;
 
-			var letter = m.Groups[1].Value[0];
+			var m = Parse(preview);
+			var letter = m.Side[0];
 			if (!won)
 				return letter + "_LOSE_E.VQA";
 
-			return m.Groups[2].Value == "09" ? letter + "_FINL_E.VQA" : null;
+			return m.Level == 9 ? letter + "_FINL_E.VQA" : null;
 		}
 	}
 }
