@@ -257,13 +257,13 @@ namespace OpenRAHost
 				}
 				else
 				{
-					card.AddView(MakeButton("Встановити / докачати вміст", false, engineReady, () => Launch(game.Id + "-content")),
-						ButtonParams(Dp(10)));
-					card.AddView(MakeButton("Імпортувати файли гри (відео, музика)", false, true, StartPicker),
+					card.AddView(MakeButton("Імпортувати файли гри (відео, музика)", true, true, StartPicker),
 						ButtonParams(Dp(10)));
 					card.AddView(MakeText(
-						"Вибрати папку зі Steam/Origin/Remastered-версією або дисками: файли скопіюються, гра сама розпакує все потрібне (відео, музику) і запуститься.",
+						"Відкриється вибір папки (як для Dune 2000): виберіть папку зі Steam/Origin/Remastered-версією або дисками. Файли скопіюються, гра сама розпакує відео й музику та запуститься.",
 						12, Dim));
+					card.AddView(MakeButton("Завантажити безкоштовні файли з інтернету", false, engineReady, () => Launch(game.Id + "-content")),
+						ButtonParams(Dp(10)));
 					if (SourceImporter.HasImport(FilesRoot))
 						card.AddView(MakeButton("Видалити скопійовані файли імпорту (звільнити місце)", false, true, () =>
 						{
