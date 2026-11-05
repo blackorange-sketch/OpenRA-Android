@@ -1,6 +1,8 @@
 package org.openra.android;
 
+import android.content.Context;
 import android.graphics.Point;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Display;
@@ -31,6 +33,38 @@ public class OpenRAActivity extends SDLActivity {
 		// 6 = SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 		setRequestedOrientation(6);
 		super.onCreate(savedInstanceState);
+
+		// Keep the clocks steady during long battles instead of letting the phone throttle after a few minutes.
+		if (Build.VERSION.SDK_INT >= 24) {
+			try {
+				getWindow().setSustainedPerformanceMode(true);
+			} catch (Throwable ignored) {
+			}
+		}
+
+		// Android drops multicast packets on Wi-Fi unless an app holds this lock. UPnP / LAN game discovery need them.
+		try {
+			WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+			if (wifi != null) {
+				multicastLock = wifi.createMulticastLock("openra");
+				multicastLock.setReferenceCounted(false);
+				multicastLock.acquire();
+			}
+		} catch (Throwable ignored) {
+		}
+	}
+
+	private WifiManager.MulticastLock multicastLock;
+
+	@Override
+	protected void onDestroy() {
+		try {
+			if (multicastLock != null && multicastLock.isHeld())
+				multicastLock.release();
+		} catch (Throwable ignored) {
+		}
+
+		super.onDestroy();
 	}
 
 	@Override
