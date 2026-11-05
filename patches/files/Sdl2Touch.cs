@@ -114,7 +114,7 @@ namespace OpenRA.Platforms.Default
 		float surfW = 1000, surfH = 500;
 
 		// ---- On-screen buttons: drawn by DrawOverlay, hit-tested here before anything reaches the widget tree ----
-		enum HudKind { Group, SelectAll, Base, Event, Pause, Add, Attack, Cancel }
+		enum HudKind { Group, SelectAll, Base, Event, Pause, Add, Attack, Chat, Cancel }
 
 		struct HudButton
 		{
@@ -126,6 +126,8 @@ namespace OpenRA.Platforms.Default
 		const int GroupButtons = 5;
 		readonly List<HudButton> hud = new();
 		Size hudRes;
+		bool hudMulti;
+		bool textInput;
 		int hudIndex = -1;
 		bool hudFired;
 		int lastGroup = -1;
@@ -137,15 +139,17 @@ namespace OpenRA.Platforms.Default
 		void LayoutHud()
 		{
 			var res = Game.Renderer.Resolution;
-			if (res == hudRes && hud.Count > 0)
+			var multi = Game.IsMultiplayerGame;
+			if (res == hudRes && hud.Count > 0 && multi == hudMulti)
 				return;
 
 			hudRes = res;
+			hudMulti = multi;
 			hud.Clear();
 
 			const float GapF = 0.12f;
 			const float SplitF = 0.7f;
-			const int Actions = 7;
+			var Actions = multi ? 8 : 7;
 			var total = GroupButtons + Actions;
 			var avail = res.Width * 0.74f; // stay clear of the sidebar on the right
 			var size = Math.Min(res.Height * 0.085f, avail / (total + (total - 2) * GapF + SplitF));
@@ -154,7 +158,9 @@ namespace OpenRA.Platforms.Default
 			var x = Math.Max(res.Height * 0.16f, (avail - width) / 2);
 			var y = res.Height * 0.012f;
 
-			var kinds = new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add, HudKind.Attack, HudKind.Cancel };
+			var kinds = multi
+				? new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add, HudKind.Attack, HudKind.Chat, HudKind.Cancel }
+				: new[] { HudKind.SelectAll, HudKind.Base, HudKind.Event, HudKind.Pause, HudKind.Add, HudKind.Attack, HudKind.Cancel };
 			for (var i = 0; i < total; i++)
 			{
 				if (i == GroupButtons)
@@ -320,6 +326,7 @@ namespace OpenRA.Platforms.Default
 						Toast("Наступне виділення додається до поточного");
 
 					break;
+				case HudKind.Chat: Key(h, Keycode.RETURN, Modifiers.Shift); break;
 				case HudKind.Attack:
 					if (Game.IsAttackMoveArmed)
 						RightCancel(h);
@@ -405,6 +412,7 @@ namespace OpenRA.Platforms.Default
 					case HudKind.Base: Label(bold, "База", cx, cy, white); break;
 					case HudKind.Event: Label(bold, "Подія", cx, cy, white); break;
 					case HudKind.Attack: Label(bold, "Атака", cx, cy, white); break;
+					case HudKind.Chat: Label(bold, "Чат", cx, cy, white); break;
 					case HudKind.Pause:
 					{
 						var bw = b.W * 0.14f;
@@ -1015,6 +1023,17 @@ namespace OpenRA.Platforms.Default
 		public void Tick(Sdl2PlatformWindow device, IInputHandler h, Modifiers mods, Func<int, int, int2> toPos)
 		{
 			lastToPos = toPos;
+
+			// The on-screen keyboard is shown while a text field has the keyboard focus (chat, names, addresses).
+			var wantText = Ui.KeyboardFocusWidget?.GetType().Name.Contains("TextField", StringComparison.Ordinal) == true;
+			if (wantText != textInput)
+			{
+				textInput = wantText;
+				if (wantText)
+					SDL.SDL_StartTextInput();
+				else
+					SDL.SDL_StopTextInput();
+			}
 
 			// Holding a group button assigns the current selection to that group.
 			if (mode == Mode.Hud && fingers.Count == 1 && hudIndex >= 0 && hudIndex < hud.Count && !hudFired

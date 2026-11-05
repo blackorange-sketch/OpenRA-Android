@@ -173,6 +173,7 @@ patch(
     "OpenRA.Game/Game.cs",
     "\t\tpublic static bool IsWorldPaused => worldRenderer?.World?.Paused == true;\n\n",
     "\t\tpublic static bool IsWorldPaused => worldRenderer?.World?.Paused == true;\n\n"
+    "\t\tpublic static bool IsMultiplayerGame => worldRenderer?.World?.LobbyInfo.NonBotClients.Count() > 1;\n\n"
     "\t\t/// <summary>Android host: called when the window loses focus. Pauses a running game that has no other human players.</summary>\n"
     "\t\tpublic static void PauseForBackground()\n"
     "\t\t{\n"
