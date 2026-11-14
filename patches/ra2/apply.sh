@@ -236,6 +236,15 @@ edit("OpenRA.Mods.Common/Graphics/DefaultSpriteSequence.cs", [(
     "new Vector3(dx, dy, dz), s.Channel, r.BlendMode);",
     "new Vector3(dx, dy, dz), s.Channel, r.BlendMode, s.Bounds.Width > 0 ? s.Size.X / s.Bounds.Width : 1f);")])
 
+# the chrome widgets ignore the sprite scale of sequences: fit oversized (2x) icons to the icon cell
+edit("OpenRA.Mods.Common/Widgets/ProductionPaletteWidget.cs", [(
+    "WidgetUtils.DrawSpriteCentered(icon.Sprite, icon.Palette, icon.Pos + iconOffset);",
+    "WidgetUtils.DrawSpriteCentered(icon.Sprite, icon.Palette, icon.Pos + iconOffset, icon.Sprite.Size.X > IconSize.X ? IconSize.X / icon.Sprite.Size.X : 1f);")])
+
+edit("OpenRA.Mods.Common/Widgets/SupportPowersWidget.cs", [(
+    "WidgetUtils.DrawSpriteCentered(p.Sprite, p.Palette, p.Pos + iconOffset);",
+    "WidgetUtils.DrawSpriteCentered(p.Sprite, p.Palette, p.Pos + iconOffset, p.Sprite.Size.X > IconSize.X ? IconSize.X / p.Sprite.Size.X : 1f);")])
+
 edit("OpenRA.Game/Graphics/SheetBuilder.cs", [
     ("\t\t\treturn Add(frame.Data, frame.Type, frame.Size, 0, frame.Offset.AsVector3(), premultiplied);",
      "\t\t\treturn Add(frame.Data, frame.Type, frame.Size, 0, frame.Offset.AsVector3(), premultiplied, frame is IScaledSpriteFrame sf ? sf.Scale : 1f);"),
