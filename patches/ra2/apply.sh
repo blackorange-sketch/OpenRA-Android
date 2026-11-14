@@ -151,6 +151,19 @@ if not os.path.exists(cmd):
 os.remove(cmd)
 PY
 
+# --- world rules: the engine no longer creates the voxel cache / model renderer itself, the world actor must have them ---
+python3 - "$1/mods/ra2/rules/world.yaml" <<'PY'
+import sys
+
+path = sys.argv[1]
+s = open(path, encoding="utf-8-sig").read()
+old = "\tActorMap:\n\tScreenMap:\n"
+if old not in s:
+    sys.exit("world.yaml: ActorMap/ScreenMap not found")
+s = s.replace(old, old + "\tVoxelCache:\n\tModelRenderer:\n", 1)
+open(path, "w", encoding="utf-8").write(s)
+PY
+
 # --- mod.yaml: move the manifest to the format of the pinned engine ---
 python3 - "$1/mods/ra2/mod.yaml" <<'PY'
 import re, sys
