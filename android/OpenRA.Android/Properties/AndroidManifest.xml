@@ -6,11 +6,11 @@
 	<uses-permission android:name="android.permission.VIBRATE" />
 	<uses-feature android:glEsVersion="0x00030000" android:required="true" />
 	<uses-feature android:name="android.hardware.touchscreen" android:required="true" />
-	<application android:label="OpenRA" android:extractNativeLibs="true" android:largeHeap="true">
+	<application android:label="Red Alert 2" android:extractNativeLibs="true" android:largeHeap="true">
 		<activity
 			android:name="org.openra.android.OpenRAActivity"
 			android:exported="false"
-			android:label="OpenRA"
+			android:label="Red Alert 2"
 			android:launchMode="singleTask"
 			android:screenOrientation="sensorLandscape"
 			android:theme="@android:style/Theme.NoTitleBar.Fullscreen"

@@ -18,7 +18,7 @@ namespace OpenRAHost
 	/// Launcher: shows whether the game files are present, imports them from a folder the player picks,
 	/// unpacks the engine payload and starts the SDL activity.
 	/// </summary>
-	[Activity(Label = "OpenRA", MainLauncher = true, Exported = true,
+	[Activity(Label = "Red Alert 2", MainLauncher = true, Exported = true,
 		ScreenOrientation = ScreenOrientation.SensorLandscape,
 		Theme = "@android:style/Theme.Material.NoActionBar")]
 	public class MainActivity : Activity

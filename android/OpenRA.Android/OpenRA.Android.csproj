@@ -10,8 +10,8 @@
 
 		<ApplicationId>org.openra.android.ra2</ApplicationId>
 		<ApplicationTitle>Red Alert 2</ApplicationTitle>
-		<ApplicationVersion>1</ApplicationVersion>
-		<ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>2</ApplicationVersion>
+		<ApplicationDisplayVersion>0.1.1</ApplicationDisplayVersion>
 		<SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
 
 		<RuntimeIdentifier>android-arm64</RuntimeIdentifier>

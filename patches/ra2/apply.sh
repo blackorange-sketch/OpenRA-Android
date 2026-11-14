@@ -194,6 +194,9 @@ lines[i:j] = [
     "\tra2|languages/rules/en.ftl",
 ]
 
+# {DEV_VERSION} is only substituted by the desktop packaging scripts; show a real version in the main menu
+lines[:] = [("\tVersion: Android 0.1" if l.strip() == "Version: {DEV_VERSION}" else l) for l in lines]
+
 # The engine has no ModelSequenceFormat entry any more (voxels are listed under ModelSequences)
 lines[:] = [l for l in lines if not l.startswith("ModelSequenceFormat:")]
 
