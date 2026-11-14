@@ -50,7 +50,9 @@ done
 echo "==> Building OpenRA.Utility for the YAML check"
 dotnet build "$OPENRA/OpenRA.Utility/OpenRA.Utility.csproj" -c Release --nologo -v:quiet -p:EngineRootPath="$OPENRA" || true
 echo "==> ra2 --check-yaml"
-( cd "$OPENRA" && timeout 300 dotnet bin/OpenRA.Utility.dll ra2 --check-yaml 2>&1 | head -n 120 ) || true
+( cd "$OPENRA" && ENGINE_DIR="$OPENRA" timeout 300 dotnet bin/OpenRA.Utility.dll ra2 --check-yaml 2>&1 | head -n 150 ) || true
+echo "==> utility logs"
+find "$HOME/.config/openra" "$HOME/.openra" -name "*.log" 2>/dev/null | while read -r f; do echo "--- $f"; tail -n 40 "$f"; done || true
 
 echo "==> Staging payload"
 rm -rf "$STAGE"; mkdir -p "$STAGE/bin" "$STAGE/mods"
