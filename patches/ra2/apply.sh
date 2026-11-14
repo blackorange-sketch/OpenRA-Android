@@ -236,6 +236,28 @@ for f in glob.glob(os.path.join(root, "sequences", "*.yaml")):
 print("icon sequences scaled:", count)
 PY
 
+# --- chrome widgets ignore the sequence Scale: shrink oversized (2x) icons to the icon cell ---
+python3 - "$1/OpenRA.Mods.Common/Widgets" <<'PY'
+import os
+import sys
+
+root = sys.argv[1]
+edits = [
+    ("ProductionPaletteWidget.cs",
+     "WidgetUtils.DrawSpriteCentered(icon.Sprite, icon.Palette, icon.Pos + iconOffset);",
+     "WidgetUtils.DrawSpriteCentered(icon.Sprite, icon.Palette, icon.Pos + iconOffset, System.Math.Min(1f, IconSize.X / icon.Sprite.Size.X));"),
+    ("SupportPowersWidget.cs",
+     "WidgetUtils.DrawSpriteCentered(p.Sprite, p.Palette, p.Pos + iconOffset);",
+     "WidgetUtils.DrawSpriteCentered(p.Sprite, p.Palette, p.Pos + iconOffset, System.Math.Min(1f, IconSize.X / p.Sprite.Size.X));"),
+]
+for name, old, new in edits:
+    path = os.path.join(root, name)
+    s = open(path, encoding="utf-8-sig").read()
+    if old not in s:
+        sys.exit(name + ": draw call not found")
+    open(path, "w", encoding="utf-8").write(s.replace(old, new, 1))
+PY
+
 # --- mod.yaml: move the manifest to the format of the pinned engine ---
 python3 - "$1/mods/ra2/mod.yaml" <<'PY'
 import re, sys
