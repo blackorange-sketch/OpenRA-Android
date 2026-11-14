@@ -197,6 +197,11 @@ lines[i:j] = [
 # The engine has no ModelSequenceFormat entry any more (voxels are listed under ModelSequences)
 lines[:] = [l for l in lines if not l.startswith("ModelSequenceFormat:")]
 
+# The engine's content installer is a separate *-content mod now (ModContent needs a Mod field); the APK imports
+# the player's files itself, so the section is dropped
+i, j = block("ModContent:")
+del lines[i:j]
+
 # Server traits: LobbySettingsNotification is gone, SkirmishLogic is new
 i, j = block("ServerTraits:")
 lines[i:j] = ["ServerTraits:", "\tLobbyCommands", "\tSkirmishLogic", "\tPlayerPinger", "\tMasterServerPinger"]
