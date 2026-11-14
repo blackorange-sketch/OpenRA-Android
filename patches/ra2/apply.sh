@@ -164,6 +164,22 @@ s = s.replace(old, old + "\tVoxelCache:\n\tModelRenderer:\n", 1)
 open(path, "w", encoding="utf-8").write(s)
 PY
 
+# --- map actors placed outside the map (RA2 maps have fences there) make FrozenUnderFog throw: don't spawn them ---
+python3 - "$1/OpenRA.Mods.Common/Traits/World/SpawnMapActors.cs" <<'PY'
+import sys
+
+path = sys.argv[1]
+s = open(path, encoding="utf-8-sig").read()
+old = "\t\t\t\tvar actor = world.CreateActor(true, actorReference);\n"
+if old not in s:
+    sys.exit("SpawnMapActors: CreateActor call not found")
+new = ("\t\t\t\tvar locInit = actorReference.GetOrDefault<LocationInit>();\n"
+       "\t\t\t\tif (locInit != null && !world.Map.Contains(locInit.Value))\n"
+       "\t\t\t\t\tcontinue;\n\n" + old)
+s = s.replace(old, new, 1)
+open(path, "w", encoding="utf-8").write(s)
+PY
+
 # --- mod.yaml: move the manifest to the format of the pinned engine ---
 python3 - "$1/mods/ra2/mod.yaml" <<'PY'
 import re, sys
