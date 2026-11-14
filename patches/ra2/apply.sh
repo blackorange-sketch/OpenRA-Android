@@ -180,6 +180,19 @@ s = s.replace(old, new, 1)
 open(path, "w", encoding="utf-8").write(s)
 PY
 
+# --- chrome: lobby-bits needs the "bot" region the engine UI asks for (reuse the player icon) ---
+python3 - "$1/mods/ra2/chrome.yaml" <<'PY'
+import sys
+
+path = sys.argv[1]
+s = open(path, encoding="utf-8-sig").read()
+old = "\t\tplayer-anonymous: 118, 16, 16, 16\n"
+if old not in s:
+    sys.exit("chrome.yaml: player-anonymous not found")
+s = s.replace(old, old + "\t\tbot: 118, 16, 16, 16\n", 1)
+open(path, "w", encoding="utf-8").write(s)
+PY
+
 # --- mod.yaml: move the manifest to the format of the pinned engine ---
 python3 - "$1/mods/ra2/mod.yaml" <<'PY'
 import re, sys
