@@ -194,6 +194,9 @@ lines[i:j] = [
     "\tra2|languages/rules/en.ftl",
 ]
 
+# The engine has no ModelSequenceFormat entry any more (voxels are listed under ModelSequences)
+lines[:] = [l for l in lines if not l.startswith("ModelSequenceFormat:")]
+
 # Server traits: LobbySettingsNotification is gone, SkirmishLogic is new
 i, j = block("ServerTraits:")
 lines[i:j] = ["ServerTraits:", "\tLobbyCommands", "\tSkirmishLogic", "\tPlayerPinger", "\tMasterServerPinger"]
