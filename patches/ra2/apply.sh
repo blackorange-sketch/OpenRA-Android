@@ -118,3 +118,35 @@ for rel in ("Traits/Render/WithCarrierParentPipsDecoration.cs", "Traits/Render/W
         "self.CenterPosition, screenPos, 0, palette, 1f)",
         "self.CenterPosition, screenPos.ToVector2(), 0, palette, 1f)"))
 PY
+
+python3 - "$1/OpenRA.Mods.RA2" <<'PY'
+import os, sys
+
+root = sys.argv[1]
+
+
+def edit(rel, fn):
+    path = os.path.join(root, rel)
+    s = open(path, encoding="utf-8-sig").read()
+    n = fn(s)
+    if n == s:
+        sys.exit(f"patch did not change {rel}")
+    open(path, "w", encoding="utf-8").write(n)
+
+
+# Mobile.Nudge(self) is now the Nudge activity
+edit("Traits/SpawnSurvivors.cs", lambda s: s.replace(
+    "mobile?.Nudge(unit);",
+    "if (mobile != null)\n\t\t\t\t\t\tunit.QueueActivity(false, new OpenRA.Mods.Common.Activities.Nudge(unit));"))
+
+# WarheadDebugOverlay.AddImpact takes an ImmutableArray<WDist>
+edit("Warheads/CreateTintedCellsWarhead.cs", lambda s: s.replace(
+    "var range = Exts.MakeArray(Range.Length, i => WDist.FromCells(Range[i].Length));",
+    "var range = System.Collections.Immutable.ImmutableArray.Create(Exts.MakeArray(Range.Length, i => WDist.FromCells(Range[i].Length)));"))
+
+# The RA2 map importer is a command line tool for desktop; it is not needed in the APK
+cmd = os.path.join(root, "UtilityCommands", "ImportRA2MapCommand.cs")
+if not os.path.exists(cmd):
+    sys.exit("ImportRA2MapCommand.cs not found")
+os.remove(cmd)
+PY
