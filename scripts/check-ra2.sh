@@ -31,6 +31,8 @@ done
 
 cd "$OPENRA"
 export ENGINE_DIR="$OPENRA"
+echo "==> ra2 --update-mod release-20231010 (engine's own migration rules)"
+(ENGINE_DIR="$OPENRA" timeout 900 dotnet bin/OpenRA.Utility.dll ra2 --update-mod release-20231010 --apply --yes 2>&1 | tail -n 120 ) || true
 echo "==> ra2 --check-yaml"
 timeout 600 dotnet bin/OpenRA.Utility.dll ra2 --check-yaml 2>&1 | head -n 300 || true
 echo "==> utility logs"
