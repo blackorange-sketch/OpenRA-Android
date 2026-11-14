@@ -15,30 +15,14 @@ namespace OpenRAHost
 
 	static class Games
 	{
+		// This branch builds the Red Alert 2 APK: one game, files imported by the player (RA2 is not freeware).
 		public static readonly GameInfo[] All =
 		{
 			new GameInfo
 			{
-				Id = "d2k", Name = "Dune 2000", Line1 = "DUNE", Line2 = "2000",
-				ContentDir = "d2k/v3", Test = new string[0]
-			},
-			new GameInfo
-			{
-				Id = "ra", Name = "Red Alert", Line1 = "RED", Line2 = "ALERT",
-				ContentDir = "ra/v2",
-				Test = new[] { "allies.mix", "conquer.mix", "interior.mix", "hires.mix", "lores.mix", "local.mix", "speech.mix", "russian.mix", "snow.mix", "sounds.mix", "temperat.mix" }
-			},
-			new GameInfo
-			{
-				Id = "cnc", Name = "Tiberian Dawn", Line1 = "TIBERIAN", Line2 = "DAWN",
-				ContentDir = "cnc",
-				Test = new[] { "conquer.mix", "desert.mix", "sounds.mix", "speech.mix", "temperat.mix", "tempicnh.mix", "winter.mix" }
-			},
-			new GameInfo
-			{
-				Id = "ts", Name = "Tiberian Sun", Line1 = "TIBERIAN", Line2 = "SUN",
-				ContentDir = "ts",
-				Test = new[] { "cache.mix", "conquer.mix", "isosnow.mix", "isotemp.mix", "local.mix", "sidec01.mix", "sidec02.mix", "sno.mix", "snow.mix", "sounds.mix", "speech01.mix", "tem.mix", "temperat.mix" }
+				Id = "ra2", Name = "Red Alert 2", Line1 = "RED ALERT", Line2 = "2",
+				ContentDir = "ra2",
+				Test = new[] { "ra2.mix", "language.mix" }
 			}
 		};
 

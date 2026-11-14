@@ -22,30 +22,49 @@ echo "==> OpenRA at $(git -C "$OPENRA" rev-parse HEAD)"
 
 bash "$ROOT/patches/apply.sh" "$OPENRA"
 
-for proj in OpenRA.Mods.Common OpenRA.Mods.Cnc OpenRA.Mods.D2k OpenRA.Platforms.Default; do
+# --- Red Alert 2 mod (OpenRA/ra2) at the pinned commit; its C# project is built inside the engine tree ---
+RA2_REF="$(tr -d '[:space:]' < "$ROOT/RA2_REF")"
+RA2SRC="$ROOT/ra2-src"
+if [ ! -d "$RA2SRC/.git" ]; then
+	mkdir -p "$RA2SRC"
+	git -C "$RA2SRC" init -q
+	git -C "$RA2SRC" remote add origin https://github.com/OpenRA/ra2.git
+fi
+git -C "$RA2SRC" fetch -q --depth 1 origin "$RA2_REF"
+git -C "$RA2SRC" checkout -q -f FETCH_HEAD
+echo "==> RA2 mod at $(git -C "$RA2SRC" rev-parse HEAD)"
+rm -rf "$OPENRA/OpenRA.Mods.RA2" "$OPENRA/mods/ra2"
+cp -r "$RA2SRC/OpenRA.Mods.RA2" "$OPENRA/OpenRA.Mods.RA2"
+cp -r "$RA2SRC/mods/ra2" "$OPENRA/mods/ra2"
+if [ -d "$ROOT/patches/ra2" ]; then
+	bash "$ROOT/patches/ra2/apply.sh" "$OPENRA"
+fi
+
+for proj in OpenRA.Mods.Common OpenRA.Mods.Cnc OpenRA.Mods.RA2 OpenRA.Platforms.Default; do
 	echo "==> Building $proj"
-	dotnet build "$OPENRA/$proj/$proj.csproj" -c Release --nologo -v:minimal
+	# the RA2 project points at ../engine by default; here it lives inside the engine tree
+	dotnet build "$OPENRA/$proj/$proj.csproj" -c Release --nologo -v:minimal -p:EngineRootPath="$OPENRA"
 done
 
 echo "==> Staging payload"
 rm -rf "$STAGE"; mkdir -p "$STAGE/bin" "$STAGE/mods"
 cp "$OPENRA"/bin/*.dll "$STAGE/bin/"
 cp "$OPENRA"/bin/*.deps.json "$STAGE/bin/" 2>/dev/null || true
-for mod in all common common-content d2k d2k-content ra ra-content cnc cnc-content ts ts-content; do
+for mod in all common common-content ra2; do
 	cp -r "$OPENRA/mods/$mod" "$STAGE/mods/$mod"
 done
 cp -r "$OPENRA/glsl" "$STAGE/glsl"
 cp "$OPENRA/global mix database.dat" "$STAGE/"
 echo "android-m1" > "$STAGE/VERSION"
 
-for f in OpenRA.Mods.Common.dll OpenRA.Mods.Cnc.dll OpenRA.Mods.D2k.dll OpenRA.Platforms.Default.dll; do
+for f in OpenRA.Mods.Common.dll OpenRA.Mods.Cnc.dll OpenRA.Mods.RA2.dll OpenRA.Platforms.Default.dll; do
 	[ -f "$STAGE/bin/$f" ] || { echo "missing $f in payload" >&2; exit 1; }
 done
 
 echo "==> payload/bin:"; ls -1 "$STAGE/bin" | sed 's/^/    /'
 
-echo "==> Assemblies requested by the d2k mod manifest:"
-grep -A8 '^Assemblies:' "$OPENRA/mods/d2k/mod.yaml" || true
+echo "==> Assemblies requested by the ra2 mod manifest:"
+grep -A8 '^Assemblies:' "$OPENRA/mods/ra2/mod.yaml" || true
 
 echo "==> Building Russian/English text sets"
 python3 "$ROOT/scripts/merge-ftl.py" "$OPENRA" "$ROOT/translations/ru" "$STAGE/translations"

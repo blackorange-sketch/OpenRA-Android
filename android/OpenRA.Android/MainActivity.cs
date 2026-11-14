@@ -43,7 +43,7 @@ namespace OpenRAHost
 		// Which game the launcher shows and starts (OpenRA mod id).
 		string SelectedGame
 		{
-			get => GetSharedPreferences("openra", FileCreationMode.Private).GetString("game", "d2k");
+			get => GetSharedPreferences("openra", FileCreationMode.Private).GetString("game", "ra2");
 			set => GetSharedPreferences("openra", FileCreationMode.Private).Edit().PutString("game", value).Apply();
 		}
 
@@ -160,7 +160,8 @@ namespace OpenRAHost
 		void BuildMain()
 		{
 			var game = Games.ById(SelectedGame);
-			var isDune = game.Id == "d2k";
+			var isDune = game.Id == "d2k" || game.Id == "ra2";
+			var isD2k = game.Id == "d2k";
 			var contentOk = Games.IsInstalled(game, FilesRoot);
 
 			var root = new LinearLayout(this) { Orientation = Orientation.Horizontal };
@@ -204,7 +205,7 @@ namespace OpenRAHost
 			card.AddView(MakeText("Файли гри", 14, Dim));
 			var status = MakeText(
 				isDune
-					? (contentOk ? "✔ Файли Dune 2000 імпортовано" : "✖ Файли гри ще не додані")
+					? (contentOk ? "✔ Файли гри імпортовано" : "✖ Файли гри ще не додані")
 					: (contentOk ? "✔ Файли гри встановлені" : "ℹ Файли ще не встановлені"),
 				20, contentOk ? Good : (isDune ? Bad : Dim), true);
 			status.SetPadding(0, Dp(4), 0, Dp(4));
@@ -214,7 +215,7 @@ namespace OpenRAHost
 				isDune
 					? (contentOk
 						? "Можна грати. Щоб оновити файли, імпортуйте папку ще раз."
-						: "Натисніть «Імпортувати» і виберіть папку з вашою грою Dune 2000 (там, де лежать BLOXBASE.R16, SOUND.RS, папки GAMESFX, Movies, Music).")
+						: (isD2k ? "Натисніть «Імпортувати» і виберіть папку з вашою грою Dune 2000 (там, де лежать BLOXBASE.R16, SOUND.RS, папки GAMESFX, Movies, Music)." : "Red Alert 2 не безкоштовна. Натисніть «Імпортувати» і виберіть папку з вашою встановленою грою (там, де лежать ra2.mix, language.mix, theme.mix)."))
 					: (contentOk
 						? "Можна грати."
 						: "Натисніть «Грати». При першому запуску гра запропонує встановити вміст: виберіть швидке встановлення, безкоштовна версія завантажиться з інтернету (потрібен інтернет)."),
@@ -283,7 +284,7 @@ namespace OpenRAHost
 					new LinearLayout.LayoutParams(Dp(64), ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(8) });
 				card.AddView(calib, ButtonParams(Dp(10)));
 
-				if (isDune)
+				if (isD2k)
 				{
 					var russian = VoiceFolder == "GAMESFXRus";
 					card.AddView(MakeButton("Озвучка: " + (russian ? "російська" : "оригінальна (англ.)") + "  — змінити",
@@ -406,6 +407,24 @@ namespace OpenRAHost
 
 			Task.Run(() =>
 			{
+				if (SelectedGame == "ra2")
+				{
+					var (rFiles, rBytes, rError) = Ra2Importer.Import(this, tree, FilesRoot, msg =>
+					{
+						busyText = msg;
+						RunOnUiThread(() => BuildMain());
+					});
+
+					lastImportNote = rError != null
+						? "Помилка імпорту: " + rError
+						: rFiles == 0
+							? "У вибраній папці не знайдено ra2.mix / language.mix. Виберіть папку встановленої Red Alert 2."
+							: $"Скопійовано файлів: {rFiles} ({rBytes / 1048576} МБ).";
+					busy = false;
+					RunOnUiThread(BuildMain);
+					return;
+				}
+
 				if (SelectedGame != "d2k")
 				{
 					var (files, bytes, error) = SourceImporter.Import(this, tree, FilesRoot, SelectedGame, msg =>
