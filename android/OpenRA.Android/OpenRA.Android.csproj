@@ -9,7 +9,7 @@
 		<LangVersion>13</LangVersion>
 
 		<ApplicationId>org.openra.android.ra2</ApplicationId>
-		<ApplicationTitle>OpenRA RA2</ApplicationTitle>
+		<ApplicationTitle>Red Alert 2</ApplicationTitle>
 		<ApplicationVersion>1</ApplicationVersion>
 		<ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
 		<SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>

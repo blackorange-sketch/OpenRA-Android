@@ -46,6 +46,12 @@ for proj in OpenRA.Mods.Common OpenRA.Mods.Cnc OpenRA.Mods.RA2 OpenRA.Platforms.
 	dotnet build "$OPENRA/$proj/$proj.csproj" -c Release --nologo -v:minimal -p:EngineRootPath="$OPENRA"
 done
 
+# YAML lint of the RA2 mod on the CI machine (no device needed); informational, never fails the build
+echo "==> Building OpenRA.Utility for the YAML check"
+dotnet build "$OPENRA/OpenRA.Utility/OpenRA.Utility.csproj" -c Release --nologo -v:quiet -p:EngineRootPath="$OPENRA" || true
+echo "==> ra2 --check-yaml"
+( cd "$OPENRA" && timeout 300 dotnet bin/OpenRA.Utility.dll ra2 --check-yaml 2>&1 | head -n 120 ) || true
+
 echo "==> Staging payload"
 rm -rf "$STAGE"; mkdir -p "$STAGE/bin" "$STAGE/mods"
 cp "$OPENRA"/bin/*.dll "$STAGE/bin/"

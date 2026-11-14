@@ -150,3 +150,53 @@ if not os.path.exists(cmd):
     sys.exit("ImportRA2MapCommand.cs not found")
 os.remove(cmd)
 PY
+
+# --- mod.yaml: move the manifest to the format of the pinned engine ---
+python3 - "$1/mods/ra2/mod.yaml" <<'PY'
+import re, sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8-sig").read().split("\n")
+
+
+def block(start_key):
+    """(start, end) line indexes of a top-level section: its header line and the lines indented below it."""
+    for i, l in enumerate(lines):
+        if l.startswith(start_key):
+            j = i + 1
+            while j < len(lines) and (lines[j].startswith("\t") or lines[j].strip() == ""):
+                j += 1
+            # keep trailing blank lines out of the block
+            while lines[j - 1].strip() == "":
+                j -= 1
+            return i, j
+    sys.exit(f"section {start_key} not found")
+
+
+# Packages -> FileSystem: DefaultFileSystem / Packages
+i, j = block("Packages:")
+body = ["\t" + l for l in lines[i + 1:j]]
+lines[i:j] = ["FileSystem: DefaultFileSystem", "\tPackages:"] + body
+
+# Assemblies: one comma separated line of file names
+i, j = block("Assemblies:")
+lines[i:j] = ["Assemblies: OpenRA.Mods.Common.dll, OpenRA.Mods.Cnc.dll, OpenRA.Mods.RA2.dll"]
+
+# Translations -> FluentMessages; the common messages moved to common|fluent
+i, j = block("Translations:")
+lines[i:j] = [
+    "FluentMessages:",
+    "\tcommon|fluent/common.ftl",
+    "\tcommon|fluent/chrome.ftl",
+    "\tcommon|fluent/ingame-debug.ftl",
+    "\tcommon|fluent/hotkeys.ftl",
+    "\tcommon|fluent/rules.ftl",
+    "\tra2|languages/rules/en.ftl",
+]
+
+# Server traits: LobbySettingsNotification is gone, SkirmishLogic is new
+i, j = block("ServerTraits:")
+lines[i:j] = ["ServerTraits:", "\tLobbyCommands", "\tSkirmishLogic", "\tPlayerPinger", "\tMasterServerPinger"]
+
+open(path, "w", encoding="utf-8").write("\n".join(lines))
+PY
