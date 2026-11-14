@@ -210,52 +210,37 @@ if "SpriteFormats: ShpTS," not in s:
 s = s.replace("SpriteFormats: ShpTS,", "SpriteFormats: ShpTSUpscale, ShpTS,", 1)
 open(path, "w", encoding="utf-8").write(s)
 
-count = 0
-for f in glob.glob(os.path.join(root, "sequences", "*.yaml")):
-    lines = open(f, encoding="utf-8-sig").read().split("\n")
-    out = []
-    in_top_icon = False
-    for line in lines:
-        out.append(line)
-        if re.match(r"^icon:\s*$", line):
-            in_top_icon = True
-            continue
-        if line and not line.startswith("\t") and not line.startswith("#"):
-            in_top_icon = False
-        m = re.match(r"^(\t+)icon:\s*$", line)
-        if m:
-            out.append(m.group(1) + "\tScale: 0.5")
-            count += 1
-            continue
-        if in_top_icon:
-            m = re.match(r"^\t(\w+):\s*$", line)
-            if m:
-                out.append("\t\tScale: 0.5")
-                count += 1
-    open(f, "w", encoding="utf-8").write("\n".join(out))
-print("icon sequences scaled:", count)
 PY
 
-# --- chrome widgets ignore the sequence Scale: shrink oversized (2x) icons to the icon cell ---
-python3 - "$1/OpenRA.Mods.Common/Widgets" <<'PY'
+# engine: let a sprite frame ask for a display scale (used by the 2x icons above)
+python3 - "$1" <<'PY'
 import os
 import sys
 
 root = sys.argv[1]
-edits = [
-    ("ProductionPaletteWidget.cs",
-     "WidgetUtils.DrawSpriteCentered(icon.Sprite, icon.Palette, icon.Pos + iconOffset);",
-     "WidgetUtils.DrawSpriteCentered(icon.Sprite, icon.Palette, icon.Pos + iconOffset, System.Math.Min(1f, IconSize.X / icon.Sprite.Size.X));"),
-    ("SupportPowersWidget.cs",
-     "WidgetUtils.DrawSpriteCentered(p.Sprite, p.Palette, p.Pos + iconOffset);",
-     "WidgetUtils.DrawSpriteCentered(p.Sprite, p.Palette, p.Pos + iconOffset, System.Math.Min(1f, IconSize.X / p.Sprite.Size.X));"),
-]
-for name, old, new in edits:
-    path = os.path.join(root, name)
+
+def edit(rel, pairs):
+    path = os.path.join(root, rel)
     s = open(path, encoding="utf-8-sig").read()
-    if old not in s:
-        sys.exit(name + ": draw call not found")
-    open(path, "w", encoding="utf-8").write(s.replace(old, new, 1))
+    for old, new in pairs:
+        if old not in s:
+            sys.exit(rel + ": pattern not found: " + old[:60])
+        s = s.replace(old, new, 1)
+    open(path, "w", encoding="utf-8").write(s)
+
+edit("OpenRA.Game/Graphics/SpriteLoader.cs", [(
+    "\tpublic interface ISpriteLoader\n",
+    "\tpublic interface IScaledSpriteFrame\n\t{\n\t\tfloat Scale { get; }\n\t}\n\n\tpublic interface ISpriteLoader\n")])
+
+edit("OpenRA.Game/Graphics/SheetBuilder.cs", [
+    ("\t\t\treturn Add(frame.Data, frame.Type, frame.Size, 0, frame.Offset.AsVector3(), premultiplied);",
+     "\t\t\treturn Add(frame.Data, frame.Type, frame.Size, 0, frame.Offset.AsVector3(), premultiplied, frame is IScaledSpriteFrame sf ? sf.Scale : 1f);"),
+    ("public Sprite Add(byte[] src, SpriteFrameType type, Size size, float zRamp, in Vector3 spriteOffset, bool premultiplied = false)",
+     "public Sprite Add(byte[] src, SpriteFrameType type, Size size, float zRamp, in Vector3 spriteOffset, bool premultiplied = false, float scale = 1f)"),
+    ("var rect = Allocate(size, zRamp, spriteOffset);\n\t\t\tUtil.FastCopyIntoChannel(rect, src, type, premultiplied);",
+     "var rect = Allocate(size, zRamp, spriteOffset, scale);\n\t\t\tUtil.FastCopyIntoChannel(rect, src, type, premultiplied);"),
+])
+
 PY
 
 # --- mod.yaml: move the manifest to the format of the pinned engine ---

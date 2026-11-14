@@ -21,13 +21,13 @@ namespace OpenRA.Mods.RA2.Graphics
 	/// <summary>
 	/// Loads sidebar icons (*icon.shp) like ShpTS, but converts them to true colour
 	/// and enlarges them 2x with smoothing, so they stay readable on high-DPI screens.
-	/// Sequences using these icons must set Scale: 0.5 to keep the original on-screen size.
+	/// The frames report a Scale of 1/2, so they keep the original on-screen size.
 	/// </summary>
 	public class ShpTSUpscaleLoader : ISpriteLoader
 	{
 		const int Factor = 2;
 
-		sealed class UpscaledFrame : ISpriteFrame
+		sealed class UpscaledFrame : ISpriteFrame, IScaledSpriteFrame
 		{
 			public SpriteFrameType Type => SpriteFrameType.Bgra32;
 			public Size Size { get; }
@@ -35,12 +35,13 @@ namespace OpenRA.Mods.RA2.Graphics
 			public Vector2 Offset { get; }
 			public byte[] Data { get; }
 			public bool DisableExportPadding => false;
+			public float Scale => 1f / Factor;
 
 			public UpscaledFrame(ISpriteFrame src, uint[] palette)
 			{
 				Size = new Size(src.Size.Width * Factor, src.Size.Height * Factor);
 				FrameSize = new Size(src.FrameSize.Width * Factor, src.FrameSize.Height * Factor);
-				Offset = src.Offset * Factor;
+				Offset = src.Offset;
 				Data = new byte[Size.Width * Size.Height * 4];
 
 				var sw = src.Size.Width;
