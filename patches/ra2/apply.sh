@@ -232,6 +232,10 @@ edit("OpenRA.Game/Graphics/SpriteLoader.cs", [(
     "\tpublic interface ISpriteLoader\n",
     "\tpublic interface IScaledSpriteFrame\n\t{\n\t\tfloat Scale { get; }\n\t}\n\n\tpublic interface ISpriteLoader\n")])
 
+edit("OpenRA.Mods.Common/Graphics/DefaultSpriteSequence.cs", [(
+    "new Vector3(dx, dy, dz), s.Channel, r.BlendMode);",
+    "new Vector3(dx, dy, dz), s.Channel, r.BlendMode, s.Bounds.Width > 0 ? s.Size.X / s.Bounds.Width : 1f);")])
+
 edit("OpenRA.Game/Graphics/SheetBuilder.cs", [
     ("\t\t\treturn Add(frame.Data, frame.Type, frame.Size, 0, frame.Offset.AsVector3(), premultiplied);",
      "\t\t\treturn Add(frame.Data, frame.Type, frame.Size, 0, frame.Offset.AsVector3(), premultiplied, frame is IScaledSpriteFrame sf ? sf.Scale : 1f);"),
