@@ -137,7 +137,7 @@ def edit(rel, fn):
 # Mobile.Nudge(self) is now the Nudge activity
 edit("Traits/SpawnSurvivors.cs", lambda s: s.replace(
     "mobile?.Nudge(unit);",
-    "if (mobile != null)\n\t\t\t\t\t\tunit.QueueActivity(false, new OpenRA.Mods.Common.Activities.Nudge(unit));"))
+    "if (mobile != null)\n\t\t\t\t\t\tunit.QueueActivity(false, new OpenRA.Mods.Common.Traits.Nudge(unit));"))
 
 # WarheadDebugOverlay.AddImpact takes an ImmutableArray<WDist>
 edit("Warheads/CreateTintedCellsWarhead.cs", lambda s: s.replace(
