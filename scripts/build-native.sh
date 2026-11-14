@@ -36,7 +36,15 @@ fetch() { # url dest-dir
 	if [ -d "$dest" ]; then return; fi
 	mkdir -p "$dest"
 	echo "==> Downloading $url"
-	curl -fsSL --retry 3 "$url" | tar -xz --strip-components=1 -C "$dest"
+	local tmp; tmp="$(mktemp)"
+	local ok=0
+	for attempt in 1 2 3 4 5; do
+		if curl -fsSL --retry 3 --retry-all-errors --retry-delay 3 -o "$tmp" "$url" && tar -tzf "$tmp" >/dev/null 2>&1; then ok=1; break; fi
+		echo "download failed (attempt $attempt), retrying" >&2; sleep 5
+	done
+	[ "$ok" = 1 ] || { rm -rf "$dest" "$tmp"; echo "could not download $url" >&2; return 1; }
+	tar -xzf "$tmp" --strip-components=1 -C "$dest"
+	rm -f "$tmp"
 }
 
 cmake_build() { # srcdir builddir extra-args...
