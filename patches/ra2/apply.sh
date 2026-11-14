@@ -193,6 +193,49 @@ s = s.replace(old, old + "\t\tbot: 118, 16, 16, 16\n", 1)
 open(path, "w", encoding="utf-8").write(s)
 PY
 
+# --- sidebar icons: smooth 2x true-colour icons (loader generated on the device from the user's own cameo files) ---
+cp "$(dirname "$0")/files/ShpTSUpscaleLoader.cs" "$1/OpenRA.Mods.RA2/Graphics/ShpTSUpscaleLoader.cs"
+python3 - "$1/mods/ra2" <<'PY'
+import glob
+import os
+import re
+import sys
+
+root = sys.argv[1]
+
+path = os.path.join(root, "mod.yaml")
+s = open(path, encoding="utf-8-sig").read()
+if "SpriteFormats: ShpTS," not in s:
+    sys.exit("mod.yaml: SpriteFormats line not found")
+s = s.replace("SpriteFormats: ShpTS,", "SpriteFormats: ShpTSUpscale, ShpTS,", 1)
+open(path, "w", encoding="utf-8").write(s)
+
+count = 0
+for f in glob.glob(os.path.join(root, "sequences", "*.yaml")):
+    lines = open(f, encoding="utf-8-sig").read().split("\n")
+    out = []
+    in_top_icon = False
+    for line in lines:
+        out.append(line)
+        if re.match(r"^icon:\s*$", line):
+            in_top_icon = True
+            continue
+        if line and not line.startswith("\t") and not line.startswith("#"):
+            in_top_icon = False
+        m = re.match(r"^(\t+)icon:\s*$", line)
+        if m:
+            out.append(m.group(1) + "\tScale: 0.5")
+            count += 1
+            continue
+        if in_top_icon:
+            m = re.match(r"^\t(\w+):\s*$", line)
+            if m:
+                out.append("\t\tScale: 0.5")
+                count += 1
+    open(f, "w", encoding="utf-8").write("\n".join(out))
+print("icon sequences scaled:", count)
+PY
+
 # --- mod.yaml: move the manifest to the format of the pinned engine ---
 python3 - "$1/mods/ra2/mod.yaml" <<'PY'
 import re, sys
