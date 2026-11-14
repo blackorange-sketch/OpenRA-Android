@@ -77,3 +77,44 @@ edit("Traits/ChronoResourceDelivery.cs", lambda s: (lambda t: t)(
         "\t\t\t\tself.QueueActivity(new MoveToDock(self, hostActor, host));\n\t\t\t\tself.QueueActivity(new FindAndDeliverResources(self));")
 ).replace("\t\t\trefinery = null;\n", "\t\t\tdockHostActor = null;\n\t\t\tdockHost = null;\n"))
 PY
+
+python3 - "$1/OpenRA.Mods.RA2" <<'PY'
+import os, re, sys
+
+root = sys.argv[1]
+
+
+def edit(rel, fn):
+    path = os.path.join(root, rel)
+    s = open(path, encoding="utf-8-sig").read()
+    n = fn(s)
+    if n == s:
+        sys.exit(f"patch did not change {rel}")
+    open(path, "w", encoding="utf-8").write(n)
+
+
+def add_using(s, ns):
+    line = f"using {ns};\n"
+    if line in s:
+        return s
+    m = re.search(r"^using OpenRA", s, re.M)
+    return s[:m.start()] + line + s[m.start():]
+
+
+# Stream.WriteArray(byte[]) -> Stream.Write(ReadOnlySpan<byte>)
+edit("FileSystem/BagFile.cs", lambda s: s.replace(".WriteArray(", ".Write("))
+
+# float3 -> Vector3
+edit("Graphics/ArcRenderable.cs", lambda s: add_using(s.replace("new float3[", "new Vector3["), "System.Numerics"))
+
+# IEnumerable<WPos>.PositionClosestTo -> ClosestToIgnoringPath
+edit("Projectiles/ArcLaserZap.cs", lambda s: s.replace(".PositionClosestTo(", ".ClosestToIgnoringPath("))
+
+# Sprite.Size is a Vector3 now and UISpriteRenderable takes a Vector2 screen position
+for rel in ("Traits/Render/WithCarrierParentPipsDecoration.cs", "Traits/Render/WithMindControllerPipsDecoration.cs"):
+    edit(rel, lambda s: s.replace(
+        "var pipSize = pips.Image.Size.XY.ToInt2();",
+        "var pipSize = new int2((int)pips.Image.Size.X, (int)pips.Image.Size.Y);").replace(
+        "self.CenterPosition, screenPos, 0, palette, 1f)",
+        "self.CenterPosition, screenPos.ToVector2(), 0, palette, 1f)"))
+PY
